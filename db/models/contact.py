@@ -18,6 +18,8 @@ class Contact(Base):
     telegram = Column(String, nullable=True)
     whatsapp = Column(String, nullable=True)
     twitter_handle = Column(String, nullable=True)
+    slack_handle = Column(String, nullable=True)
+    linkedin_profile = Column(String, nullable=True)
 
     extra_meta = Column(JSON, nullable=True)  # avatars, profile bios, etc.
     created_at = Column(DateTime, default=datetime.utcnow)
