@@ -1,33 +1,56 @@
 import uuid
-from sqlalchemy import Column, ForeignKey, String, Text, Enum, DateTime, JSON
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import Column, ForeignKey, String, Text, Enum, DateTime, JSON, Integer, Float, Index, UniqueConstraint
+from sqlalchemy.dialects.postgresql import UUID, ARRAY
+from sqlalchemy.orm import relationship
 from datetime import datetime
 from db.base import Base
 import enum
 
-class MessageSource(str, enum.Enum):
+class Platform(str, enum.Enum):
+    """Supported messaging platforms."""
     gmail = "gmail"
+    slack = "slack"
+    discord = "discord"
     whatsapp = "whatsapp"
+    twitter = "twitter"
     telegram = "telegram"
-    twitter_dm = "twitter_dm"
-
-class MessageDirection(str, enum.Enum):
-    incoming = "incoming"
-    outgoing = "outgoing"
+    google_chat = "google_chat"
+    linkedin = "linkedin"
+    instagram = "instagram"
 
 class Message(Base):
+    """Core message model with unified schema across platforms."""
     __tablename__ = "messages"
+    
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    contact_id = Column(UUID(as_uuid=True), ForeignKey("contacts.id", ondelete="CASCADE"), nullable=False)
-
-    source = Column(Enum(MessageSource), nullable=False)
-    direction = Column(Enum(MessageDirection), nullable=False)
-    content = Column(Text, nullable=False)
-    timestamp = Column(DateTime, nullable=False)
-
-    thread_id = Column(String, nullable=True)  # Gmail thread, Telegram conversation ID, etc.
-    transcript = Column(Text, nullable=True)  # For calls/voice notes
-    metadata = Column(JSON, nullable=True)  # message_id, attachments, reactions
-
-    created_at = Column(DateTime, default=datetime.utcnow)
+    platform = Column(String(50), nullable=False)
+    platform_message_id = Column(String(255), nullable=False)
+    thread_id = Column(UUID(as_uuid=True), ForeignKey("threads.id"), nullable=False)
+    sender_id = Column(UUID(as_uuid=True), ForeignKey("participants.id"), nullable=False)
+    
+    # Content fields
+    content_text = Column(Text)
+    content_html = Column(Text)
+    content_markdown = Column(Text)
+    
+    # Timestamps
+    timestamp = Column(DateTime(timezone=True), nullable=False)
+    created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
+    updated_at = Column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Metadata and raw data
+    message_metadata = Column(JSON)  # Platform-specific metadata
+    raw_data = Column(JSON)  # Original platform data
+    
+    # Relationships
+    thread = relationship("Thread", back_populates="messages")
+    sender = relationship("Participant", back_populates="sent_messages")
+    attachments = relationship("Attachment", back_populates="message", cascade="all, delete-orphan")
+    entities = relationship("MessageEntity", back_populates="message", cascade="all, delete-orphan")
+    
+    __table_args__ = (
+        UniqueConstraint('platform', 'platform_message_id', name='uq_platform_message'),
+        Index('ix_messages_thread_timestamp', 'thread_id', 'timestamp'),
+        Index('ix_messages_sender_timestamp', 'sender_id', 'timestamp'),
+        Index('ix_messages_platform_timestamp', 'platform', 'timestamp'),
+    )

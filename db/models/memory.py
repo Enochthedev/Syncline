@@ -1,5 +1,6 @@
 import uuid
-from sqlalchemy import JSON, Column, UUID as PGUUID, ForeignKey, String, Text, Enum, DateTime
+from sqlalchemy import JSON, Column, ForeignKey, String, Text, Enum, DateTime
+from sqlalchemy.dialects.postgresql import UUID
 from datetime import datetime
 from db.base import Base
 import enum
