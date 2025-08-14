@@ -7,7 +7,7 @@
   - Create database connection utilities with connection pooling
   - _Requirements: 10.1, 10.2, 10.4_
 
-- [ ] 2. Implement unified message schema and normalization
+- [x] 2. Implement unified message schema and normalization
   - Create NormalizedMessage, Thread, and Participant data classes
   - Implement MessageNormalizer service with platform-agnostic conversion
   - Add MIME type cleaning and content standardization utilities
@@ -15,7 +15,7 @@
   - Write unit tests for message normalization across different platforms
   - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5_
 
-- [ ] 3. Build event-driven messaging infrastructure
+- [x] 3. Build event-driven messaging infrastructure
   - Implement Redis Streams event bus with producer/consumer patterns
   - Create EventBus service with message publishing and subscription
   - Add event serialization/deserialization with proper error handling
@@ -40,7 +40,7 @@
   - _Requirements: 1.1, 2.1, 2.2, 2.3_
 
 - [ ] 6. Build AI processing engine foundation
-  - Create AIProcessingEngine service with LLM integration (OpenAI GPT-4)
+  - Create AIProcessingEngine service with LLM integration (OpenAI GPT-4, anthropic, ollama)
   - Implement PII redaction service for privacy-preserving AI processing
   - Add embedding generation utilities using OpenAI Ada-002
   - Create AI agent base class with common processing patterns
