@@ -1,8 +1,25 @@
+"""
+Ingestion service for fetching messages from various platforms.
+
+This service coordinates the fetching and initial processing of messages
+from different platforms like Gmail, X (Twitter), Slack, etc.
+"""
+
+import logging
+from typing import List, Dict, Any
+from datetime import datetime
+
 from integrations.gmail_client.fetch import fetch_emails
 from integrations.x_client.fetch import fetch_dms
 from integrations.x_client.auth import get_user_api
+from services.message import MessageNormalizer, get_message_normalizer
+from services.events import EventBus, get_event_bus, Event, EventType
+
+logger = logging.getLogger(__name__)
 
 # Dummy placeholder for X tokens
+
+
 def mock_user_auth_flow():
     # This would normally happen in a web server callback
     saved_token = {
@@ -11,6 +28,7 @@ def mock_user_auth_flow():
     }
     verifier = '...'
     return get_user_api(saved_token['oauth_token'], verifier, saved_token)
+
 
 def ingest_all():
     print("📩 Fetching Gmail...")

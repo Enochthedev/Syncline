@@ -86,6 +86,7 @@ class ConnectorManager:
         self._health_check_task: Optional[asyncio.Task] = None
         self._running = False
         self._lock = asyncio.Lock()
+        self._start_time: Optional[datetime] = None
 
     @property
     def status(self) -> ManagerStatus:
@@ -188,6 +189,7 @@ class ConnectorManager:
 
             # Start health check task
             self._running = True
+            self._start_time = datetime.now(timezone.utc)
             self._health_check_task = asyncio.create_task(
                 self._health_check_loop())
 
@@ -229,6 +231,7 @@ class ConnectorManager:
                 await asyncio.gather(*stop_tasks, return_exceptions=True)
 
             self._status = ManagerStatus.STOPPED
+            self._start_time = None
             logger.info("Connector manager stopped")
 
         except Exception as e:
@@ -373,7 +376,7 @@ class ConnectorManager:
         # Check restart delay
         last_restart = self._last_restarts.get(platform)
         if last_restart:
-            time_since_restart = datetime.utcnow() - last_restart
+            time_since_restart = datetime.now(timezone.utc) - last_restart
             if time_since_restart.total_seconds() < config.restart_delay:
                 logger.debug(f"Restart delay not met for {platform}")
                 return
@@ -387,12 +390,12 @@ class ConnectorManager:
 
             # Update restart tracking
             self._restart_counts[platform] = restart_count + 1
-            self._last_restarts[platform] = datetime.utcnow()
+            self._last_restarts[platform] = datetime.now(timezone.utc)
 
             # Update stats
             stats = self._connector_stats[platform]
             stats.restart_count += 1
-            stats.last_restart = datetime.utcnow()
+            stats.last_restart = datetime.now(timezone.utc)
 
             logger.info(f"Connector for {platform} restarted successfully")
 
@@ -475,5 +478,5 @@ class ConnectorManager:
             "enabled_connectors": enabled_connectors,
             "healthy_connectors": healthy_connectors,
             "health_check_interval": self.health_check_interval,
-            "uptime_seconds": (datetime.utcnow() - datetime.utcnow()).total_seconds() if self._running else 0
+            "uptime_seconds": 0 if not self._running or not self._start_time else (datetime.now(timezone.utc) - self._start_time).total_seconds()
         }
