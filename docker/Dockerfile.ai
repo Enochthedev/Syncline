@@ -1,0 +1,77 @@
+# Multi-stage build for AI processing service
+FROM python:3.11-slim as builder
+
+# Set environment variables
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
+
+# Install system dependencies for building
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    libpq-dev \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create virtual environment
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+# Copy requirements and install Python dependencies
+COPY requirements.txt .
+RUN pip install --upgrade pip && \
+    pip install -r requirements.txt
+
+# Install additional AI dependencies
+RUN pip install \
+    torch --index-url https://download.pytorch.org/whl/cpu \
+    transformers \
+    sentence-transformers \
+    spacy \
+    presidio-analyzer \
+    presidio-anonymizer
+
+# Download spaCy model
+RUN python -m spacy download en_core_web_sm
+
+# Production stage
+FROM python:3.11-slim as production
+
+# Set environment variables
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PATH="/opt/venv/bin:$PATH"
+
+# Install runtime dependencies
+RUN apt-get update && apt-get install -y \
+    libpq5 \
+    curl \
+    && rm -rf /var/lib/apt/lists/* \
+    && groupadd -r aiuser && useradd -r -g aiuser aiuser
+
+# Copy virtual environment from builder
+COPY --from=builder /opt/venv /opt/venv
+
+# Set work directory
+WORKDIR /app
+
+# Copy application code
+COPY --chown=aiuser:aiuser . .
+
+# Create necessary directories
+RUN mkdir -p logs storage/attachments storage/tokens vector_db && \
+    chown -R aiuser:aiuser logs storage vector_db
+
+# Switch to non-root user
+USER aiuser
+
+# Health check
+HEALTHCHECK --interval=60s --timeout=30s --start-period=10s --retries=3 \
+    CMD python -c "from services.ai.engine import AIProcessingEngine; print('AI service healthy')" || exit 1
+
+# Expose port for health checks
+EXPOSE 8002
+
+# Run AI processing service
+CMD ["python", "-m", "services.ai.engine"]

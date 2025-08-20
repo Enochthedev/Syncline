@@ -1,0 +1,59 @@
+# Multi-stage build for background workers
+FROM python:3.11-slim as builder
+
+# Set environment variables
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
+
+# Install system dependencies for building
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create virtual environment
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+# Copy requirements and install Python dependencies
+COPY requirements.txt .
+RUN pip install --upgrade pip && \
+    pip install -r requirements.txt
+
+# Production stage
+FROM python:3.11-slim as production
+
+# Set environment variables
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PATH="/opt/venv/bin:$PATH"
+
+# Install runtime dependencies
+RUN apt-get update && apt-get install -y \
+    libpq5 \
+    && rm -rf /var/lib/apt/lists/* \
+    && groupadd -r worker && useradd -r -g worker worker
+
+# Copy virtual environment from builder
+COPY --from=builder /opt/venv /opt/venv
+
+# Set work directory
+WORKDIR /app
+
+# Copy application code
+COPY --chown=worker:worker . .
+
+# Create necessary directories
+RUN mkdir -p logs storage/attachments storage/tokens vector_db && \
+    chown -R worker:worker logs storage vector_db
+
+# Switch to non-root user
+USER worker
+
+# Expose port for health checks
+EXPOSE 8001
+
+# Run worker processes
+CMD ["python", "-m", "services.batch_processing.scheduler"]

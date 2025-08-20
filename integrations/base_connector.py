@@ -247,36 +247,54 @@ class BaseConnector(ABC):
         if not self._session:
             raise RuntimeError("Connector not started")
 
-        # Check circuit breaker
-        if self.circuit_breaker and not await self.circuit_breaker.can_execute():
-            raise CircuitBreakerError("Circuit breaker is open")
-
-        # Apply rate limiting
-        if self.rate_limiter:
-            await self.rate_limiter.acquire()
+        # Use resilience features if available
+        from services.resilience import get_circuit_breaker, get_retry_handler, NETWORK_RETRY_CONFIG
 
         try:
-            # Add authentication headers
-            if self.token_manager:
-                token = await self.token_manager.get_token(self.platform)
-                if token:
-                    kwargs.setdefault('headers', {})
-                    kwargs['headers']['Authorization'] = f"{token.token_type} {token.access_token}"
+            # Get circuit breaker for this platform
+            circuit_breaker = await get_circuit_breaker(
+                f"{self.platform}_api",
+                config=None  # Use default config
+            )
 
-            response = await self._session.request(method, url, **kwargs)
+            # Get retry handler for network requests
+            retry_handler = await get_retry_handler(
+                f"{self.platform}_network",
+                config=NETWORK_RETRY_CONFIG
+            )
 
-            # Record success for circuit breaker
-            if self.circuit_breaker:
-                await self.circuit_breaker.record_success()
+            # Execute request with circuit breaker and retry protection
+            async def make_request():
+                # Apply rate limiting
+                if self.rate_limiter:
+                    await self.rate_limiter.acquire()
 
-            return response
+                # Add authentication headers
+                if self.token_manager:
+                    token = await self.token_manager.get_token(self.platform)
+                    if token:
+                        kwargs.setdefault('headers', {})
+                        kwargs['headers']['Authorization'] = f"{token.token_type} {token.access_token}"
+
+                response = await self._session.request(method, url, **kwargs)
+
+                # Handle rate limiting
+                if response.status == 429:
+                    retry_after = response.headers.get('Retry-After')
+                    raise RateLimitError(
+                        f"Rate limit exceeded: {response.status}",
+                        int(retry_after) if retry_after else None
+                    )
+
+                return response
+
+            # Execute with circuit breaker protection
+            return await circuit_breaker.call(
+                lambda: retry_handler.execute(make_request)
+            )
 
         except Exception as e:
-            # Record failure for circuit breaker
-            if self.circuit_breaker:
-                await self.circuit_breaker.record_failure()
-
-            # Handle rate limiting
+            # Handle specific error types
             if isinstance(e, aiohttp.ClientResponseError) and e.status == 429:
                 retry_after = None
                 if 'Retry-After' in e.headers:

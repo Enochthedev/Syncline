@@ -1,0 +1,68 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mesh-config
+  namespace: mesh-system
+  labels:
+    app.kubernetes.io/name: mesh-ingestion-system
+    app.kubernetes.io/component: config
+data:
+  ENVIRONMENT: "production"
+  LOG_LEVEL: "INFO"
+  REDIS_URL: "redis://redis-service:6379"
+  CHROMA_HOST: "chromadb-service"
+  CHROMA_PORT: "8000"
+  OLLAMA_BASE_URL: "http://ollama-service:11434"
+  
+  # Database configuration
+  POSTGRES_DB: "mesh_production"
+  POSTGRES_USER: "mesh_user"
+  
+  # Application settings
+  MAX_MESSAGE_BATCH_SIZE: "100"
+  AI_PROCESSING_ENABLED: "true"
+  VECTOR_DB_ENABLED: "true"
+  
+  # Rate limiting
+  RATE_LIMIT_REQUESTS_PER_MINUTE: "1000"
+  RATE_LIMIT_BURST_SIZE: "100"
+  
+  # Health check settings
+  HEALTH_CHECK_INTERVAL: "30"
+  HEALTH_CHECK_TIMEOUT: "10"
+  
+  # Monitoring
+  METRICS_ENABLED: "true"
+  PROMETHEUS_PORT: "9090"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: mesh-secrets
+  namespace: mesh-system
+  labels:
+    app.kubernetes.io/name: mesh-ingestion-system
+    app.kubernetes.io/component: secrets
+type: Opaque
+stringData:
+  # Database credentials
+  POSTGRES_PASSWORD: "change-me-in-production"
+  DATABASE_URL: "postgresql+asyncpg://mesh_user:change-me-in-production@postgres-service:5432/mesh_production"
+  
+  # Platform API keys (to be set during deployment)
+  GMAIL_CLIENT_ID: ""
+  GMAIL_CLIENT_SECRET: ""
+  SLACK_CLIENT_ID: ""
+  SLACK_CLIENT_SECRET: ""
+  DISCORD_BOT_TOKEN: ""
+  TWITTER_API_KEY: ""
+  TWITTER_API_SECRET: ""
+  TELEGRAM_BOT_TOKEN: ""
+  
+  # AI service keys
+  OPENAI_API_KEY: ""
+  ANTHROPIC_API_KEY: ""
+  
+  # Security keys
+  JWT_SECRET_KEY: "change-me-in-production"
+  ENCRYPTION_KEY: "change-me-in-production"

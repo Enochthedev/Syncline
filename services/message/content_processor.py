@@ -1,16 +1,19 @@
 """
 Content processing utilities for message normalization.
 
-This module handles content cleaning, format conversion, and standardization
+This module handles content cleaning, format conversion, and text processing
 for messages from different platforms.
 """
 
+import hashlib
 import re
+from datetime import datetime
 from typing import Dict, List, Optional, Any, Tuple
 from urllib.parse import urlparse
 import logging
 
-from .schema import MessageContent, ContentType
+from services.message_schema import MessageContent, ContentType
+from utils.mime_utils import clean_mime_type, resolve_mime_type, is_safe_mime_type
 
 logger = logging.getLogger(__name__)
 
@@ -43,121 +46,61 @@ class ContentProcessor:
 
     @staticmethod
     def html_to_text(html_content: str) -> str:
-        """Convert HTML to plain text."""
+        """Convert HTML content to plain text."""
         if not html_content:
             return ""
 
-        # Remove HTML tags
-        text = re.sub(r'<[^>]+>', '', html_content)
+        # Clean HTML first
+        clean_html = ContentProcessor.clean_html(html_content)
 
-        # Decode HTML entities
-        html_entities = {
-            '&amp;': '&',
-            '&lt;': '<',
-            '&gt;': '>',
-            '&quot;': '"',
-            '&#39;': "'",
-            '&nbsp;': ' ',
-        }
+        # Convert common HTML entities
+        clean_html = clean_html.replace('&nbsp;', ' ')
+        clean_html = clean_html.replace('&amp;', '&')
+        clean_html = clean_html.replace('&lt;', '<')
+        clean_html = clean_html.replace('&gt;', '>')
+        clean_html = clean_html.replace('&quot;', '"')
+        clean_html = clean_html.replace('&#39;', "'")
 
-        for entity, char in html_entities.items():
-            text = text.replace(entity, char)
+        # Convert line breaks
+        clean_html = re.sub(r'<br\s*/?>', '\n', clean_html,
+                            flags=re.IGNORECASE)
+        clean_html = re.sub(r'</p>', '\n\n', clean_html, flags=re.IGNORECASE)
+        clean_html = re.sub(r'</div>', '\n', clean_html, flags=re.IGNORECASE)
+
+        # Remove all remaining HTML tags
+        text = re.sub(r'<[^>]+>', '', clean_html)
 
         # Normalize whitespace
-        text = re.sub(r'\s+', ' ', text).strip()
+        text = re.sub(r'\n\s*\n', '\n\n', text)  # Multiple newlines to double
+        text = re.sub(r'[ \t]+', ' ', text)      # Multiple spaces to single
+        text = text.strip()
 
         return text
 
     @staticmethod
-    def html_to_markdown(html_content: str) -> str:
-        """Convert HTML to Markdown (basic conversion)."""
-        if not html_content:
+    def clean_text(text_content: str) -> str:
+        """Clean plain text content."""
+        if not text_content:
             return ""
 
-        markdown = html_content
+        # Normalize line endings
+        text_content = text_content.replace('\r\n', '\n').replace('\r', '\n')
 
-        # Convert common HTML tags to Markdown
-        conversions = [
-            (r'<strong[^>]*>(.*?)</strong>', r'**\1**'),
-            (r'<b[^>]*>(.*?)</b>', r'**\1**'),
-            (r'<em[^>]*>(.*?)</em>', r'*\1*'),
-            (r'<i[^>]*>(.*?)</i>', r'*\1*'),
-            (r'<code[^>]*>(.*?)</code>', r'`\1`'),
-            (r'<a[^>]*href=["\']([^"\']*)["\'][^>]*>(.*?)</a>', r'[\2](\1)'),
-            (r'<br[^>]*/?>', '\n'),
-            (r'<p[^>]*>(.*?)</p>', r'\1\n\n'),
-            (r'<h1[^>]*>(.*?)</h1>', r'# \1\n'),
-            (r'<h2[^>]*>(.*?)</h2>', r'## \1\n'),
-            (r'<h3[^>]*>(.*?)</h3>', r'### \1\n'),
-            (r'<li[^>]*>(.*?)</li>', r'- \1\n'),
-        ]
+        # Remove excessive whitespace
+        text_content = re.sub(r'[ \t]+', ' ', text_content)
+        text_content = re.sub(r'\n\s*\n\s*\n', '\n\n', text_content)
 
-        for pattern, replacement in conversions:
-            markdown = re.sub(pattern, replacement, markdown,
-                              flags=re.DOTALL | re.IGNORECASE)
-
-        # Remove remaining HTML tags
-        markdown = re.sub(r'<[^>]+>', '', markdown)
-
-        # Clean up whitespace
-        markdown = re.sub(r'\n\s*\n\s*\n', '\n\n', markdown)
-        markdown = markdown.strip()
-
-        return markdown
+        return text_content.strip()
 
     @staticmethod
-    def standardize_content(content: str, content_type: ContentType) -> MessageContent:
-        """Standardize content and generate multiple formats."""
-        if not content:
-            return MessageContent()
-
-        # Normalize whitespace and remove null characters
-        content = re.sub(r'\x00', '', content)  # Remove null bytes
-        content = re.sub(r'\r\n', '\n', content)  # Normalize CRLF to LF
-        content = re.sub(r'\r', '\n', content)    # Normalize CR to LF
-        content = content.strip()
-
-        if not content:
-            return MessageContent()
-
-        message_content = MessageContent(primary_format=content_type)
-
-        if content_type == ContentType.HTML:
-            message_content.html = ContentProcessor.clean_html(content)
-            message_content.text = ContentProcessor.html_to_text(
-                message_content.html)
-            message_content.markdown = ContentProcessor.html_to_markdown(
-                message_content.html)
-        elif content_type == ContentType.MARKDOWN:
-            message_content.markdown = content.strip()
-            # Better markdown to text conversion
-            text_content = content
-            # Remove markdown formatting but preserve structure
-            text_content = re.sub(r'\*\*(.*?)\*\*', r'\1',
-                                  text_content)  # Bold
-            text_content = re.sub(r'\*(.*?)\*', r'\1',
-                                  text_content)      # Italic
-            text_content = re.sub(
-                r'`(.*?)`', r'\1', text_content)        # Code
-            text_content = re.sub(
-                r'#{1,6}\s+', '', text_content)         # Headers
-            text_content = re.sub(
-                r'\[([^\]]+)\]\([^)]+\)', r'\1', text_content)  # Links
-            message_content.text = text_content.strip()
-        else:  # Plain text
-            message_content.text = content.strip()
-
-        return message_content
-
-    @staticmethod
-    def extract_urls(content: str) -> List[str]:
-        """Extract URLs from content."""
-        if not content:
+    def extract_urls(text: str) -> List[str]:
+        """Extract URLs from text content."""
+        if not text:
             return []
 
         # URL pattern that matches http/https URLs
-        url_pattern = r'https?://[^\s<>"\'`]+[^\s<>"\'`.,;:!?)]'
-        urls = re.findall(url_pattern, content, re.IGNORECASE)
+        url_pattern = r'https?://[^\s<>"{}|\\^`\[\]]+[^\s<>"{}|\\^`\[\].,;:!?]'
+        urls = re.findall(url_pattern, text, re.IGNORECASE)
 
         # Validate and clean URLs
         valid_urls = []
@@ -172,113 +115,186 @@ class ContentProcessor:
         return valid_urls
 
     @staticmethod
-    def extract_mentions(content: str, platform_type: str = None) -> List[str]:
-        """Extract mentions from content based on platform conventions."""
-        if not content:
+    def extract_mentions(text: str, platform: str) -> List[str]:
+        """Extract mentions from text based on platform conventions."""
+        if not text:
             return []
 
         mentions = []
 
-        # Twitter/X style mentions (@username)
-        if platform_type in ['twitter', 'x', None]:
-            twitter_mentions = re.findall(r'@([a-zA-Z0-9_]+)', content)
-            mentions.extend([f"@{mention}" for mention in twitter_mentions])
-
-        # Email style mentions (email addresses)
-        if platform_type in ['email', 'gmail', None]:
+        if platform.lower() == 'gmail':
+            # Gmail doesn't have traditional mentions, but we can extract email addresses
             email_pattern = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
-            email_mentions = re.findall(email_pattern, content)
-            mentions.extend(email_mentions)
+            mentions = re.findall(email_pattern, text)
 
-        # Slack/Discord style mentions (<@userid>)
-        if platform_type in ['slack', 'discord', None]:
-            slack_mentions = re.findall(r'<@([A-Z0-9]+)>', content)
-            mentions.extend([f"<@{mention}>" for mention in slack_mentions])
+        elif platform.lower() in ['slack', 'discord']:
+            # Slack/Discord style mentions: @username or <@userid>
+            mention_patterns = [
+                r'@([a-zA-Z0-9._-]+)',  # @username
+                r'<@([A-Z0-9]+)>',      # <@userid>
+            ]
+            for pattern in mention_patterns:
+                mentions.extend(re.findall(pattern, text))
+
+        elif platform.lower() == 'twitter':
+            # Twitter style mentions: @username
+            mentions = re.findall(r'@([a-zA-Z0-9_]+)', text)
 
         return list(set(mentions))  # Remove duplicates
 
     @staticmethod
-    def extract_hashtags(content: str) -> List[str]:
-        """Extract hashtags from content."""
-        if not content:
+    def extract_hashtags(text: str) -> List[str]:
+        """Extract hashtags from text."""
+        if not text:
             return []
 
         # Match hashtags (# followed by alphanumeric characters and underscores)
         hashtag_pattern = r'#([a-zA-Z0-9_]+)'
-        hashtags = re.findall(hashtag_pattern, content)
+        hashtags = re.findall(hashtag_pattern, text)
 
-        return [f"#{tag}" for tag in hashtags]
+        return list(set(hashtags))  # Remove duplicates
 
     @staticmethod
-    def clean_text_for_processing(text: str) -> str:
-        """Clean text for AI processing by removing noise and normalizing."""
-        if not text:
+    def detect_language(text: str) -> Optional[str]:
+        """Detect the language of text content."""
+        if not text or len(text.strip()) < 10:
+            return None
+
+        try:
+            # Simple language detection based on character patterns
+            # This is a basic implementation - could be enhanced with proper language detection
+
+            # Check for common English words
+            english_words = ['the', 'and', 'or', 'but', 'in',
+                             'on', 'at', 'to', 'for', 'of', 'with', 'by']
+            text_lower = text.lower()
+            english_count = sum(
+                1 for word in english_words if f' {word} ' in f' {text_lower} ')
+
+            if english_count >= 2:
+                return 'en'
+
+            # Check for other language patterns
+            if re.search(r'[àáâãäåæçèéêëìíîïðñòóôõöøùúûüýþÿ]', text_lower):
+                return 'es'  # Spanish/French/other Romance languages
+
+            if re.search(r'[äöüß]', text_lower):
+                return 'de'  # German
+
+            # Default to English if uncertain
+            return 'en'
+
+        except Exception as e:
+            logger.warning(f"Language detection failed: {e}")
+            return 'en'
+
+    @staticmethod
+    def calculate_content_hash(content: str) -> str:
+        """Calculate a hash for content deduplication."""
+        if not content:
             return ""
 
-        # Remove excessive whitespace
-        text = re.sub(r'\s+', ' ', text)
-
-        # Remove common email artifacts
-        text = re.sub(r'On .* wrote:', '', text)  # Email reply headers
-        text = re.sub(r'From:.*?Subject:.*?\n', '', text, flags=re.DOTALL)
-
-        # Remove excessive punctuation
-        text = re.sub(r'[.]{3,}', '...', text)
-        text = re.sub(r'[!]{2,}', '!', text)
-        text = re.sub(r'[?]{2,}', '?', text)
-
-        # Normalize quotes
-        text = re.sub(r'[""]', '"', text)
-        text = re.sub(r'['']', "'", text)
-
-        return text.strip()
+        # Normalize content for hashing
+        normalized = re.sub(r'\s+', ' ', content.strip().lower())
+        return hashlib.sha256(normalized.encode('utf-8')).hexdigest()
 
     @staticmethod
-    def truncate_content(content: str, max_length: int = 1000, preserve_words: bool = True) -> str:
-        """Truncate content to a maximum length while preserving readability."""
+    def truncate_content(content: str, max_length: int = 10000) -> str:
+        """Truncate content to maximum length while preserving word boundaries."""
         if not content or len(content) <= max_length:
             return content
 
-        if preserve_words:
-            # Find the last space before the max length
-            truncated = content[:max_length]
-            last_space = truncated.rfind(' ')
-            if last_space > max_length * 0.8:  # Only if we don't lose too much
-                truncated = truncated[:last_space]
-            return truncated + "..."
+        # Find the last space before the limit
+        truncated = content[:max_length]
+        last_space = truncated.rfind(' ')
+
+        if last_space > max_length * 0.8:  # If we found a space reasonably close to the limit
+            return content[:last_space] + '...'
         else:
-            return content[:max_length] + "..."
+            return content[:max_length] + '...'
 
     @staticmethod
-    def detect_language(content: str) -> Optional[str]:
-        """Detect the language of content (basic implementation)."""
-        if not content:
-            return None
+    def normalize_content(
+        raw_content: Dict[str, Any],
+        platform: str,
+        content_type: ContentType = ContentType.TEXT
+    ) -> MessageContent:
+        """Normalize content from platform-specific format to unified format."""
+        try:
+            text = ""
+            html = ""
+            markdown = ""
 
-        # Simple language detection based on common words
-        # This is a basic implementation - in production, use a proper language detection library
+            # Extract content based on platform
+            if platform.lower() == 'gmail':
+                # Gmail provides both text and HTML
+                text = raw_content.get('text', '')
+                html = raw_content.get('html', '')
 
-        english_indicators = ['the', 'and', 'is', 'in',
-                              'to', 'of', 'a', 'that', 'it', 'with']
-        spanish_indicators = ['el', 'la', 'de',
-                              'que', 'y', 'en', 'un', 'es', 'se', 'no']
-        french_indicators = ['le', 'de', 'et', 'à',
-                             'un', 'il', 'être', 'et', 'en', 'avoir']
+                # If we only have HTML, convert to text
+                if html and not text:
+                    text = ContentProcessor.html_to_text(html)
 
-        content_lower = content.lower()
+                # Clean HTML if present
+                if html:
+                    html = ContentProcessor.clean_html(html)
 
-        english_count = sum(
-            1 for word in english_indicators if word in content_lower)
-        spanish_count = sum(
-            1 for word in spanish_indicators if word in content_lower)
-        french_count = sum(
-            1 for word in french_indicators if word in content_lower)
+            elif platform.lower() in ['slack', 'discord']:
+                # Slack/Discord often use markdown-like formatting
+                text = raw_content.get('text', '')
+                markdown = raw_content.get(
+                    'markdown', text)  # Use text as fallback
 
-        if english_count >= spanish_count and english_count >= french_count:
-            return 'en'
-        elif spanish_count >= french_count:
-            return 'es'
-        elif french_count > 0:
-            return 'fr'
+            elif platform.lower() == 'twitter':
+                # Twitter is primarily text
+                text = raw_content.get('text', '')
 
-        return 'en'  # Default to English
+            else:
+                # Generic handling
+                text = raw_content.get('text', '')
+                html = raw_content.get('html', '')
+                markdown = raw_content.get('markdown', '')
+
+            # Clean and process text content
+            if text:
+                text = ContentProcessor.clean_text(text)
+
+            # Extract metadata
+            urls = ContentProcessor.extract_urls(text or html or markdown)
+            mentions = ContentProcessor.extract_mentions(
+                text or markdown, platform)
+            hashtags = ContentProcessor.extract_hashtags(text or markdown)
+            language = ContentProcessor.detect_language(text)
+
+            # Calculate content hash for deduplication
+            content_hash = ContentProcessor.calculate_content_hash(
+                text or html or markdown)
+
+            # Truncate if too long
+            if text and len(text) > 10000:
+                text = ContentProcessor.truncate_content(text, 10000)
+
+            return MessageContent(
+                text=text or None,
+                html=html or None,
+                markdown=markdown or None,
+                content_type=content_type,
+                language=language,
+                urls=urls,
+                mentions=mentions,
+                hashtags=hashtags,
+                content_hash=content_hash
+            )
+
+        except Exception as e:
+            logger.error(
+                f"Content normalization failed for platform {platform}: {e}")
+            # Return minimal content on error
+            fallback_text = str(raw_content.get('text', ''))
+            return MessageContent(
+                text=fallback_text if fallback_text else None,
+                content_type=ContentType.TEXT,
+                language='en',
+                content_hash=ContentProcessor.calculate_content_hash(
+                    fallback_text)
+            )

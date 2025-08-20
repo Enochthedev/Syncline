@@ -7,234 +7,21 @@ This service provides text embedding generation using various providers
 
 import asyncio
 import logging
-import numpy as np
-from dataclasses import dataclass, field
-from datetime import datetime
-from enum import Enum
-from typing import Dict, List, Optional, Union, Any
 import hashlib
-import json
-
-import openai
-from openai import AsyncOpenAI
+from datetime import datetime
+from typing import Dict, List, Optional, Union, Any
 
 from config.config import settings
 from .pii_redaction import get_pii_redaction_service
+from .embedding.types import (
+    EmbeddingProvider, EmbeddingRequest, EmbeddingResult,
+    EmbeddingError, EmbeddingCache
+)
+from .embedding.providers import (
+    OpenAIEmbeddingProvider, SentenceTransformersProvider, OllamaEmbeddingProvider
+)
 
 logger = logging.getLogger(__name__)
-
-
-class EmbeddingProvider(str, Enum):
-    """Supported embedding providers."""
-    OPENAI = "openai"
-    SENTENCE_TRANSFORMERS = "sentence_transformers"
-    OLLAMA = "ollama"
-
-
-@dataclass
-class EmbeddingRequest:
-    """Embedding generation request."""
-    id: str
-    text: str
-    model: str
-    provider: EmbeddingProvider
-    metadata: Dict[str, Any] = field(default_factory=dict)
-    created_at: datetime = field(default_factory=datetime.utcnow)
-
-
-@dataclass
-class EmbeddingResult:
-    """Embedding generation result."""
-    request_id: str
-    text: str
-    embedding: List[float]
-    model: str
-    provider: EmbeddingProvider
-    dimensions: int
-    usage: Dict[str, Any] = field(default_factory=dict)
-    metadata: Dict[str, Any] = field(default_factory=dict)
-    processing_time: float = 0.0
-    created_at: datetime = field(default_factory=datetime.utcnow)
-
-
-class EmbeddingError(Exception):
-    """Base exception for embedding errors."""
-    pass
-
-
-class EmbeddingProviderError(EmbeddingError):
-    """Error from embedding provider."""
-    pass
-
-
-class EmbeddingCache:
-    """Simple in-memory cache for embeddings."""
-
-    def __init__(self, max_size: int = 10000):
-        self.cache: Dict[str, EmbeddingResult] = {}
-        self.max_size = max_size
-        self.access_times: Dict[str, datetime] = {}
-
-    def _generate_key(self, text: str, model: str, provider: str) -> str:
-        """Generate cache key for text, model, and provider combination."""
-        content = f"{text}:{model}:{provider}"
-        return hashlib.sha256(content.encode()).hexdigest()
-
-    def get(self, text: str, model: str, provider: str) -> Optional[EmbeddingResult]:
-        """Get cached embedding result."""
-        key = self._generate_key(text, model, provider)
-
-        if key in self.cache:
-            self.access_times[key] = datetime.utcnow()
-            return self.cache[key]
-
-        return None
-
-    def put(self, result: EmbeddingResult) -> None:
-        """Cache embedding result."""
-        key = self._generate_key(
-            result.text, result.model, result.provider.value)
-
-        # Evict oldest entries if cache is full
-        if len(self.cache) >= self.max_size:
-            self._evict_oldest()
-
-        self.cache[key] = result
-        self.access_times[key] = datetime.utcnow()
-
-    def _evict_oldest(self) -> None:
-        """Evict the oldest accessed entry."""
-        if not self.access_times:
-            return
-
-        oldest_key = min(self.access_times.keys(),
-                         key=lambda k: self.access_times[k])
-        del self.cache[oldest_key]
-        del self.access_times[oldest_key]
-
-    def clear(self) -> None:
-        """Clear the cache."""
-        self.cache.clear()
-        self.access_times.clear()
-
-    def size(self) -> int:
-        """Get current cache size."""
-        return len(self.cache)
-
-
-class OpenAIEmbeddingProvider:
-    """OpenAI embedding provider."""
-
-    def __init__(self, api_key: Optional[str] = None):
-        self.client = AsyncOpenAI(api_key=api_key or settings.OPENAI_API_KEY)
-        self.default_model = settings.DEFAULT_EMBEDDING_MODEL
-
-    async def generate_embedding(
-        self,
-        text: str,
-        model: Optional[str] = None
-    ) -> List[float]:
-        """Generate embedding using OpenAI API."""
-        model = model or self.default_model
-
-        try:
-            response = await self.client.embeddings.create(
-                input=text,
-                model=model
-            )
-
-            return response.data[0].embedding
-
-        except Exception as e:
-            logger.error(f"OpenAI embedding generation failed: {e}")
-            raise EmbeddingProviderError(f"OpenAI embedding failed: {e}")
-
-    async def generate_embeddings_batch(
-        self,
-        texts: List[str],
-        model: Optional[str] = None
-    ) -> List[List[float]]:
-        """Generate embeddings for a batch of texts."""
-        model = model or self.default_model
-
-        try:
-            response = await self.client.embeddings.create(
-                input=texts,
-                model=model
-            )
-
-            return [item.embedding for item in response.data]
-
-        except Exception as e:
-            logger.error(f"OpenAI batch embedding generation failed: {e}")
-            raise EmbeddingProviderError(f"OpenAI batch embedding failed: {e}")
-
-
-class SentenceTransformersProvider:
-    """Sentence Transformers embedding provider (local)."""
-
-    def __init__(self, model_name: str = "all-MiniLM-L6-v2"):
-        self.model_name = model_name
-        self._model = None
-
-    async def _load_model(self):
-        """Load the sentence transformers model."""
-        if self._model is None:
-            try:
-                from sentence_transformers import SentenceTransformer
-                self._model = SentenceTransformer(self.model_name)
-                logger.info(
-                    f"Loaded SentenceTransformers model: {self.model_name}")
-            except ImportError:
-                raise EmbeddingProviderError(
-                    "sentence-transformers package not installed. "
-                    "Install with: pip install sentence-transformers"
-                )
-            except Exception as e:
-                raise EmbeddingProviderError(
-                    f"Failed to load model {self.model_name}: {e}")
-
-    async def generate_embedding(self, text: str, model: Optional[str] = None) -> List[float]:
-        """Generate embedding using SentenceTransformers."""
-        await self._load_model()
-
-        try:
-            # Run in thread pool to avoid blocking
-            loop = asyncio.get_event_loop()
-            embedding = await loop.run_in_executor(
-                None, self._model.encode, text
-            )
-
-            return embedding.tolist()
-
-        except Exception as e:
-            logger.error(
-                f"SentenceTransformers embedding generation failed: {e}")
-            raise EmbeddingProviderError(
-                f"SentenceTransformers embedding failed: {e}")
-
-    async def generate_embeddings_batch(
-        self,
-        texts: List[str],
-        model: Optional[str] = None
-    ) -> List[List[float]]:
-        """Generate embeddings for a batch of texts."""
-        await self._load_model()
-
-        try:
-            # Run in thread pool to avoid blocking
-            loop = asyncio.get_event_loop()
-            embeddings = await loop.run_in_executor(
-                None, self._model.encode, texts
-            )
-
-            return embeddings.tolist()
-
-        except Exception as e:
-            logger.error(
-                f"SentenceTransformers batch embedding generation failed: {e}")
-            raise EmbeddingProviderError(
-                f"SentenceTransformers batch embedding failed: {e}")
 
 
 class EmbeddingService:
@@ -259,6 +46,7 @@ class EmbeddingService:
         self._provider_classes = {
             EmbeddingProvider.OPENAI: OpenAIEmbeddingProvider,
             EmbeddingProvider.SENTENCE_TRANSFORMERS: SentenceTransformersProvider,
+            EmbeddingProvider.OLLAMA: OllamaEmbeddingProvider,
         }
 
         # Initialize cache

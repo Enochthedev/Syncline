@@ -433,3 +433,7 @@ async def get_ai_processing_engine() -> AIProcessingEngine:
         _ai_engine = AIProcessingEngine()
         await _ai_engine.initialize()
     return _ai_engine
+
+
+# Alias for backward compatibility
+get_ai_engine = get_ai_processing_engine

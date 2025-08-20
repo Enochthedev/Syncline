@@ -112,3 +112,16 @@ class ExtractionResult:
             'confidence_stats': self.confidence_stats,
             'metadata': self.metadata
         }
+
+
+# Alias for backward compatibility
+EntityExtractionResult = ExtractionResult
+
+
+class EntityExtractionError(Exception):
+    """Exception raised during entity extraction."""
+
+    def __init__(self, message: str, entity_type: Optional[str] = None, source_method: Optional[str] = None):
+        super().__init__(message)
+        self.entity_type = entity_type
+        self.source_method = source_method

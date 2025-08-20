@@ -1,22 +1,18 @@
 """
-Embedding generation services.
+Embedding services for the MESH AI system.
 
-This package contains all embedding functionality including
-providers, caching, and vector operations.
+This package provides text embedding generation using various providers
+with caching and batch processing capabilities.
 """
 
-from .service import EmbeddingService, get_embedding_service
-from .types import EmbeddingRequest, EmbeddingResult, EmbeddingProvider
-from .cache import EmbeddingCache
-from .providers import OpenAIEmbeddingProvider, OllamaEmbeddingProvider
+from .providers import OpenAIEmbeddingProvider, SentenceTransformersProvider
+from .types import EmbeddingRequest, EmbeddingResult, EmbeddingProvider, EmbeddingCache
 
 __all__ = [
-    'EmbeddingService',
-    'get_embedding_service',
+    'OpenAIEmbeddingProvider',
+    'SentenceTransformersProvider',
     'EmbeddingRequest',
     'EmbeddingResult',
     'EmbeddingProvider',
-    'EmbeddingCache',
-    'OpenAIEmbeddingProvider',
-    'OllamaEmbeddingProvider'
+    'EmbeddingCache'
 ]

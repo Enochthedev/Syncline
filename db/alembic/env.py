@@ -1,16 +1,27 @@
+from alembic import context
+from sqlalchemy import pool
+from sqlalchemy import engine_from_config
+from logging.config import fileConfig
+from db.models import (
+    attachment,
+    contact,
+    entity,
+    memory,
+    message,
+    participant,
+    summary,
+    thread,
+    user
+)
+from db.base import Base
+from config.config import settings
 import os
 import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), "..", ".."))
 
-from config.config import settings
-from db.base import Base
 
-from logging.config import fileConfig
+# Import all models so they are registered with SQLAlchemy
 
-from sqlalchemy import engine_from_config
-from sqlalchemy import pool
-
-from alembic import context
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -36,7 +47,7 @@ target_metadata = Base.metadata
 def get_sync_database_url():
     """Convert async database URL to sync version for migrations."""
     database_url = settings.DATABASE_URL
-    
+
     # Convert async URLs to sync versions
     if database_url.startswith("postgresql+asyncpg://"):
         # Replace asyncpg with psycopg2
@@ -44,7 +55,7 @@ def get_sync_database_url():
     elif database_url.startswith("postgresql://"):
         # Add psycopg2 driver explicitly
         return database_url.replace("postgresql://", "postgresql+psycopg2://")
-    
+
     return database_url
 
 

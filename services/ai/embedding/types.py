@@ -1,11 +1,11 @@
 """
-Embedding type definitions.
+Type definitions for embedding services.
 
-This module contains all data structures and enums used for
-embedding generation and vector operations.
+This module provides data classes and enums for embedding operations.
 """
 
 import hashlib
+import json
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
@@ -29,27 +29,6 @@ class EmbeddingRequest:
     metadata: Dict[str, Any] = field(default_factory=dict)
     created_at: datetime = field(default_factory=datetime.utcnow)
 
-    @classmethod
-    def create(
-        cls,
-        text: str,
-        model: str,
-        provider: EmbeddingProvider,
-        metadata: Optional[Dict[str, Any]] = None
-    ) -> 'EmbeddingRequest':
-        """Create a new embedding request with generated ID."""
-        # Generate deterministic ID based on text and model
-        content_hash = hashlib.sha256(
-            f"{text}:{model}:{provider.value}".encode()).hexdigest()
-
-        return cls(
-            id=content_hash[:16],
-            text=text,
-            model=model,
-            provider=provider,
-            metadata=metadata or {}
-        )
-
 
 @dataclass
 class EmbeddingResult:
@@ -59,73 +38,73 @@ class EmbeddingResult:
     embedding: List[float]
     model: str
     provider: EmbeddingProvider
-    dimensions: int = 0
+    dimensions: int
+    usage: Dict[str, Any] = field(default_factory=dict)
+    metadata: Dict[str, Any] = field(default_factory=dict)
     processing_time: float = 0.0
-    cached: bool = False
-    metadata: Dict[str, Any] = field(default_factory=dict)
-    created_at: datetime = field(default_factory=datetime.utcnow)
-
-    def __post_init__(self):
-        """Set dimensions after initialization."""
-        if self.embedding and self.dimensions == 0:
-            self.dimensions = len(self.embedding)
-
-    def to_dict(self) -> Dict[str, Any]:
-        """Convert to dictionary for serialization."""
-        return {
-            'request_id': self.request_id,
-            'text': self.text,
-            'embedding': self.embedding,
-            'model': self.model,
-            'provider': self.provider.value,
-            'dimensions': self.dimensions,
-            'processing_time': self.processing_time,
-            'cached': self.cached,
-            'metadata': self.metadata,
-            'created_at': self.created_at.isoformat()
-        }
-
-    @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> 'EmbeddingResult':
-        """Create from dictionary."""
-        return cls(
-            request_id=data['request_id'],
-            text=data['text'],
-            embedding=data['embedding'],
-            model=data['model'],
-            provider=EmbeddingProvider(data['provider']),
-            dimensions=data.get('dimensions', len(data['embedding'])),
-            processing_time=data.get('processing_time', 0.0),
-            cached=data.get('cached', False),
-            metadata=data.get('metadata', {}),
-            created_at=datetime.fromisoformat(
-                data.get('created_at', datetime.utcnow().isoformat()))
-        )
-
-
-@dataclass
-class BatchEmbeddingRequest:
-    """Batch embedding generation request."""
-    texts: List[str]
-    model: str
-    provider: EmbeddingProvider
-    batch_size: int = 10
-    metadata: Dict[str, Any] = field(default_factory=dict)
     created_at: datetime = field(default_factory=datetime.utcnow)
 
 
-@dataclass
-class BatchEmbeddingResult:
-    """Batch embedding generation result."""
-    results: List[EmbeddingResult]
-    total_processing_time: float = 0.0
-    cached_count: int = 0
-    generated_count: int = 0
-    failed_count: int = 0
-    metadata: Dict[str, Any] = field(default_factory=dict)
+class EmbeddingError(Exception):
+    """Base exception for embedding errors."""
+    pass
 
-    def __post_init__(self):
-        """Calculate counts after initialization."""
-        self.cached_count = sum(1 for r in self.results if r.cached)
-        self.generated_count = len(self.results) - self.cached_count
-        # failed_count would be set separately based on exceptions
+
+class EmbeddingProviderError(EmbeddingError):
+    """Error from embedding provider."""
+    pass
+
+
+class EmbeddingCache:
+    """Simple in-memory cache for embeddings."""
+
+    def __init__(self, max_size: int = 10000):
+        self.cache: Dict[str, EmbeddingResult] = {}
+        self.max_size = max_size
+        self.access_times: Dict[str, datetime] = {}
+
+    def _generate_key(self, text: str, model: str, provider: str) -> str:
+        """Generate cache key for text, model, and provider combination."""
+        content = f"{text}:{model}:{provider}"
+        return hashlib.sha256(content.encode()).hexdigest()
+
+    def get(self, text: str, model: str, provider: str) -> Optional[EmbeddingResult]:
+        """Get cached embedding result."""
+        key = self._generate_key(text, model, provider)
+
+        if key in self.cache:
+            self.access_times[key] = datetime.utcnow()
+            return self.cache[key]
+
+        return None
+
+    def put(self, result: EmbeddingResult) -> None:
+        """Cache embedding result."""
+        key = self._generate_key(
+            result.text, result.model, result.provider.value)
+
+        # Evict oldest entries if cache is full
+        if len(self.cache) >= self.max_size:
+            self._evict_oldest()
+
+        self.cache[key] = result
+        self.access_times[key] = datetime.utcnow()
+
+    def _evict_oldest(self) -> None:
+        """Evict the oldest accessed entry."""
+        if not self.access_times:
+            return
+
+        oldest_key = min(self.access_times.keys(),
+                         key=lambda k: self.access_times[k])
+        del self.cache[oldest_key]
+        del self.access_times[oldest_key]
+
+    def clear(self) -> None:
+        """Clear the cache."""
+        self.cache.clear()
+        self.access_times.clear()
+
+    def size(self) -> int:
+        """Get current cache size."""
+        return len(self.cache)

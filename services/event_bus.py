@@ -356,8 +356,25 @@ class EventBus:
                 f"Failed to process message {message_id} from stream {stream_name}: {e}"
             )
 
-            # TODO: Implement retry logic and dead letter queue
-            # For now, we'll acknowledge the message to prevent infinite retries
+            # Add to Dead Letter Queue for retry processing
+            from services.resilience import get_dead_letter_queue
+            try:
+                dlq = await get_dead_letter_queue()
+                await dlq.add_message(
+                    event=event.to_dict(),
+                    error=e,
+                    max_retries=config.max_retries,
+                    metadata={
+                        'stream_name': stream_name,
+                        'message_id': message_id,
+                        'consumer_group': config.group_name,
+                        'consumer_name': config.consumer_name
+                    }
+                )
+            except Exception as dlq_error:
+                logger.error(f"Failed to add message to DLQ: {dlq_error}")
+
+            # Acknowledge message to prevent infinite retries in Redis
             if config.auto_ack:
                 await self._redis.xack(config.stream_name, config.group_name, message_id)
 

@@ -1,0 +1,32 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "mesh-system.fullname" . }}-config
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "mesh-system.labels" . | nindent 4 }}
+    app.kubernetes.io/component: config
+data:
+  environment: {{ .Values.config.environment | quote }}
+  log-level: {{ .Values.config.logLevel | quote }}
+  redis-url: {{ include "mesh-system.redisUrl" . | quote }}
+  chroma-host: {{ include "mesh-system.chromaHost" . | quote }}
+  chroma-port: "8000"
+  ollama-base-url: {{ include "mesh-system.ollamaUrl" . | quote }}
+  
+  # Application settings
+  max-message-batch-size: {{ .Values.config.maxMessageBatchSize | quote }}
+  ai-processing-enabled: {{ .Values.config.aiProcessingEnabled | quote }}
+  vector-db-enabled: {{ .Values.config.vectorDbEnabled | quote }}
+  
+  # Rate limiting
+  rate-limit-requests-per-minute: {{ .Values.config.rateLimitRequestsPerMinute | quote }}
+  rate-limit-burst-size: {{ .Values.config.rateLimitBurstSize | quote }}
+  
+  # Health check settings
+  health-check-interval: {{ .Values.config.healthCheckInterval | quote }}
+  health-check-timeout: {{ .Values.config.healthCheckTimeout | quote }}
+  
+  # Monitoring
+  metrics-enabled: {{ .Values.config.metricsEnabled | quote }}
+  prometheus-port: {{ .Values.config.prometheusPort | quote }}

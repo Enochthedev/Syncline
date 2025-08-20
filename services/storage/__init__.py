@@ -1,16 +1,16 @@
 """
-Storage services for the MESH system.
+Storage services for the MESH ingestion system.
 
-This package contains all storage-related functionality including
-blob storage, file management, and storage backends.
+This package provides blob storage abstraction and backend implementations
+for handling message attachments and file storage.
 """
 
 from .blob_storage import BlobStorageManager, get_default_storage_manager
-from .backends import LocalStorageBackend, S3StorageBackend
+from .backends import LocalStorageClient, S3StorageClient
 
 __all__ = [
     'BlobStorageManager',
     'get_default_storage_manager',
-    'LocalStorageBackend',
-    'S3StorageBackend'
+    'LocalStorageClient',
+    'S3StorageClient'
 ]

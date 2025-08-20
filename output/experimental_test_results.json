@@ -1,0 +1,106 @@
+{
+  "tiktok": {
+    "platform": "tiktok",
+    "status": "passed",
+    "timestamp": "2025-08-18T06:10:49.764499+00:00",
+    "tests_passed": 7,
+    "tests_failed": 0,
+    "tests_total": 7,
+    "details": {
+      "platform": "tiktok",
+      "timestamp": "2025-08-18T06:10:49.766785+00:00",
+      "tests": {
+        "mock_auth": {
+          "status": "passed",
+          "message": "Mock authentication successful"
+        },
+        "mock_data": {
+          "status": "passed",
+          "message": "Generated 15 mock messages"
+        },
+        "real_api": {
+          "status": "expected_failure",
+          "message": "TikTok API access not available. Requires special developer approval from TikTok."
+        }
+      },
+      "framework_tests": {
+        "initialization": {
+          "status": "passed",
+          "message": "Connector initialized successfully"
+        },
+        "health_check": {
+          "status": "passed",
+          "message": "Health status: disconnected"
+        },
+        "mock_data": {
+          "status": "passed",
+          "message": "Generated 15 mock messages"
+        },
+        "statistics": {
+          "status": "passed",
+          "message": "Statistics collection working"
+        }
+      }
+    },
+    "errors": [],
+    "warnings": []
+  },
+  "snapchat": {
+    "platform": "snapchat",
+    "status": "passed",
+    "timestamp": "2025-08-18T06:10:50.870026+00:00",
+    "tests_passed": 8,
+    "tests_failed": 0,
+    "tests_total": 8,
+    "details": {
+      "platform": "snapchat",
+      "timestamp": "2025-08-18T06:10:50.870096+00:00",
+      "tests": {
+        "mock_auth": {
+          "status": "passed",
+          "message": "Mock authentication successful"
+        },
+        "mock_data": {
+          "status": "passed",
+          "message": "Generated 20 mock messages",
+          "content_types": [
+            "story",
+            "memory",
+            "snap",
+            "bitmoji",
+            "chat"
+          ]
+        },
+        "snap_kit": {
+          "status": "simulated_success",
+          "message": "Snap Kit basic auth simulated"
+        },
+        "ephemeral_content": {
+          "status": "passed",
+          "message": "Simulated 8 ephemeral messages",
+          "ephemeral_ratio": 0.4
+        }
+      },
+      "framework_tests": {
+        "initialization": {
+          "status": "passed",
+          "message": "Connector initialized successfully"
+        },
+        "health_check": {
+          "status": "passed",
+          "message": "Health status: disconnected"
+        },
+        "mock_data": {
+          "status": "passed",
+          "message": "Generated 20 mock messages"
+        },
+        "statistics": {
+          "status": "passed",
+          "message": "Statistics collection working"
+        }
+      }
+    },
+    "errors": [],
+    "warnings": []
+  }
+}

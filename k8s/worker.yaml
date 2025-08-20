@@ -1,0 +1,156 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mesh-worker
+  namespace: mesh-system
+  labels:
+    app.kubernetes.io/name: mesh-worker
+    app.kubernetes.io/component: worker
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: mesh-worker
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: mesh-worker
+        app.kubernetes.io/component: worker
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8001"
+        prometheus.io/path: "/metrics"
+    spec:
+      containers:
+      - name: worker
+        image: mesh-system/worker:latest
+        ports:
+        - containerPort: 8001
+          name: metrics
+        env:
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: mesh-secrets
+              key: DATABASE_URL
+        - name: REDIS_URL
+          valueFrom:
+            configMapKeyRef:
+              name: mesh-config
+              key: REDIS_URL
+        - name: CHROMA_HOST
+          valueFrom:
+            configMapKeyRef:
+              name: mesh-config
+              key: CHROMA_HOST
+        - name: CHROMA_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: mesh-config
+              key: CHROMA_PORT
+        - name: ENVIRONMENT
+          valueFrom:
+            configMapKeyRef:
+              name: mesh-config
+              key: ENVIRONMENT
+        - name: LOG_LEVEL
+          valueFrom:
+            configMapKeyRef:
+              name: mesh-config
+              key: LOG_LEVEL
+        - name: MAX_MESSAGE_BATCH_SIZE
+          valueFrom:
+            configMapKeyRef:
+              name: mesh-config
+              key: MAX_MESSAGE_BATCH_SIZE
+        volumeMounts:
+        - name: storage
+          mountPath: /app/storage
+        - name: logs
+          mountPath: /app/logs
+        - name: vector-db
+          mountPath: /app/vector_db
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "500m"
+          limits:
+            memory: "2Gi"
+            cpu: "1.5"
+        livenessProbe:
+          exec:
+            command:
+            - python
+            - -c
+            - "from services.batch_processing.scheduler import BatchScheduler; print('Worker healthy')"
+          initialDelaySeconds: 60
+          periodSeconds: 60
+          timeoutSeconds: 30
+          failureThreshold: 3
+        readinessProbe:
+          exec:
+            command:
+            - python
+            - -c
+            - "from services.batch_processing.scheduler import BatchScheduler; print('Worker ready')"
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 15
+          failureThreshold: 3
+      volumes:
+      - name: storage
+        persistentVolumeClaim:
+          claimName: mesh-storage-pvc
+      - name: logs
+        emptyDir: {}
+      - name: vector-db
+        persistentVolumeClaim:
+          claimName: mesh-vector-pvc
+      restartPolicy: Always
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: mesh-worker-hpa
+  namespace: mesh-system
+  labels:
+    app.kubernetes.io/name: mesh-worker
+    app.kubernetes.io/component: worker
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: mesh-worker
+  minReplicas: 1
+  maxReplicas: 5
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 80
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 85
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 600
+      policies:
+      - type: Percent
+        value: 25
+        periodSeconds: 120
+    scaleUp:
+      stabilizationWindowSeconds: 120
+      policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 60
