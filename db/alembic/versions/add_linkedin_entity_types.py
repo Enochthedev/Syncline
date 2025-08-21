@@ -2,7 +2,7 @@
 
 Revision ID: linkedin_entity_types
 Revises: 550d022883b1
-Create Date: 2024-08-16 12:00:00.000000
+Create Date: 2025-08-16 12:00:00.000000
 
 """
 from alembic import op

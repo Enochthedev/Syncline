@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter
 from api.routes import (
-    health, stats, participants, threads, messages, search,
+    health, stats, participants, threads, messages, search, contact_search,
     whatsapp, security, contact_dossiers, summaries, files, websocket, monitoring, tenants, batch_processing
 )
 
@@ -16,6 +16,7 @@ api_router.include_router(participants.router)
 api_router.include_router(threads.router)
 api_router.include_router(messages.router)
 api_router.include_router(search.router)
+api_router.include_router(contact_search.router)
 api_router.include_router(whatsapp.router)
 api_router.include_router(security.router)
 api_router.include_router(contact_dossiers.router)
