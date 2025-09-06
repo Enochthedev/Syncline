@@ -1,0 +1,162 @@
+{
+    "name": "R.E.M.I - Real-time External Memory Interface",
+    "short_name": "R.E.M.I",
+    "description": "Unified communication platform with intelligent contact-based search and AI insights",
+    "start_url": "/",
+    "display": "standalone",
+    "background_color": "#ffffff",
+    "theme_color": "#2563eb",
+    "orientation": "portrait-primary",
+    "scope": "/",
+    "lang": "en",
+    "categories": [
+        "productivity",
+        "communication",
+        "business"
+    ],
+    "icons": [
+        {
+            "src": "/icons/icon-72x72.png",
+            "sizes": "72x72",
+            "type": "image/png",
+            "purpose": "maskable any"
+        },
+        {
+            "src": "/icons/icon-96x96.png",
+            "sizes": "96x96",
+            "type": "image/png",
+            "purpose": "maskable any"
+        },
+        {
+            "src": "/icons/icon-128x128.png",
+            "sizes": "128x128",
+            "type": "image/png",
+            "purpose": "maskable any"
+        },
+        {
+            "src": "/icons/icon-144x144.png",
+            "sizes": "144x144",
+            "type": "image/png",
+            "purpose": "maskable any"
+        },
+        {
+            "src": "/icons/icon-152x152.png",
+            "sizes": "152x152",
+            "type": "image/png",
+            "purpose": "maskable any"
+        },
+        {
+            "src": "/icons/icon-192x192.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "maskable any"
+        },
+        {
+            "src": "/icons/icon-384x384.png",
+            "sizes": "384x384",
+            "type": "image/png",
+            "purpose": "maskable any"
+        },
+        {
+            "src": "/icons/icon-512x512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "maskable any"
+        }
+    ],
+    "shortcuts": [
+        {
+            "name": "Search Contacts",
+            "short_name": "Search",
+            "description": "Quickly search for contacts and conversations",
+            "url": "/search?type=contacts",
+            "icons": [
+                {
+                    "src": "/icons/search-96x96.png",
+                    "sizes": "96x96"
+                }
+            ]
+        },
+        {
+            "name": "Recent Messages",
+            "short_name": "Messages",
+            "description": "View recent messages and conversations",
+            "url": "/messages",
+            "icons": [
+                {
+                    "src": "/icons/messages-96x96.png",
+                    "sizes": "96x96"
+                }
+            ]
+        },
+        {
+            "name": "Analytics Dashboard",
+            "short_name": "Analytics",
+            "description": "View communication analytics and insights",
+            "url": "/analytics",
+            "icons": [
+                {
+                    "src": "/icons/analytics-96x96.png",
+                    "sizes": "96x96"
+                }
+            ]
+        }
+    ],
+    "screenshots": [
+        {
+            "src": "/screenshots/desktop-home.png",
+            "sizes": "1280x720",
+            "type": "image/png",
+            "form_factor": "wide",
+            "label": "R.E.M.I Dashboard - Desktop View"
+        },
+        {
+            "src": "/screenshots/mobile-search.png",
+            "sizes": "390x844",
+            "type": "image/png",
+            "form_factor": "narrow",
+            "label": "Contact Search - Mobile View"
+        }
+    ],
+    "related_applications": [
+        {
+            "platform": "play",
+            "url": "https://play.google.com/store/apps/details?id=com.remi.mobile",
+            "id": "com.remi.mobile"
+        },
+        {
+            "platform": "itunes",
+            "url": "https://apps.apple.com/app/remi-mobile/id123456789",
+            "id": "123456789"
+        }
+    ],
+    "prefer_related_applications": false,
+    "edge_side_panel": {
+        "preferred_width": 400
+    },
+    "launch_handler": {
+        "client_mode": "focus-existing"
+    },
+    "protocol_handlers": [
+        {
+            "protocol": "web+remi",
+            "url": "/handle?protocol=%s"
+        }
+    ],
+    "file_handlers": [
+        {
+            "action": "/import",
+            "accept": {
+                "text/csv": [
+                    ".csv"
+                ],
+                "application/json": [
+                    ".json"
+                ],
+                "text/vcard": [
+                    ".vcf"
+                ]
+            }
+        }
+    ]
+}

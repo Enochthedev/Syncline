@@ -1,0 +1,258 @@
+# Fastfile for Android deployment automation
+
+default_platform(:android)
+
+platform :android do
+  # Configuration
+  before_all do
+    # Ensure we have the required environment variables
+    ensure_env_vars(
+      env_vars: ['ANDROID_KEYSTORE_PASSWORD', 'ANDROID_KEY_ALIAS', 'ANDROID_KEY_PASSWORD']
+    ) if is_ci
+
+    # Clean previous builds
+    gradle(task: "clean")
+  end
+
+  # Development and Testing Lanes
+  desc "Run all tests"
+  lane :test do
+    gradle(
+      task: "test",
+      build_type: "Debug"
+    )
+    
+    # Run lint checks
+    gradle(task: "lint")
+    
+    # Generate test reports
+    gradle(
+      task: "jacocoTestReport",
+      build_type: "Debug"
+    )
+  end
+
+  desc "Build debug APK"
+  lane :build_debug do
+    gradle(
+      task: "assemble",
+      build_type: "Debug"
+    )
+  end
+
+  desc "Build release bundle"
+  lane :build_release do
+    # Increment version code
+    increment_version_code(
+      gradle_file_path: "app/build.gradle"
+    )
+
+    # Build the release bundle
+    gradle(
+      task: "bundle",
+      build_type: "Release",
+      properties: {
+        "android.injected.signing.store.file" => ENV['ANDROID_KEYSTORE_PATH'],
+        "android.injected.signing.store.password" => ENV['ANDROID_KEYSTORE_PASSWORD'],
+        "android.injected.signing.key.alias" => ENV['ANDROID_KEY_ALIAS'],
+        "android.injected.signing.key.password" => ENV['ANDROID_KEY_PASSWORD']
+      }
+    )
+  end
+
+  desc "Build release APK"
+  lane :build_apk do
+    # Increment version code
+    increment_version_code(
+      gradle_file_path: "app/build.gradle"
+    )
+
+    # Build the release APK
+    gradle(
+      task: "assemble",
+      build_type: "Release",
+      properties: {
+        "android.injected.signing.store.file" => ENV['ANDROID_KEYSTORE_PATH'],
+        "android.injected.signing.store.password" => ENV['ANDROID_KEYSTORE_PASSWORD'],
+        "android.injected.signing.key.alias" => ENV['ANDROID_KEY_ALIAS'],
+        "android.injected.signing.key.password" => ENV['ANDROID_KEY_PASSWORD']
+      }
+    )
+  end
+
+  # Beta Distribution
+  desc "Deploy to internal testing"
+  lane :internal do
+    build_release
+    
+    upload_to_play_store(
+      track: 'internal',
+      aab: lane_context[SharedValues::GRADLE_AAB_OUTPUT_PATH],
+      skip_upload_apk: true,
+      skip_upload_metadata: true,
+      skip_upload_changelogs: true,
+      skip_upload_images: true,
+      skip_upload_screenshots: true
+    )
+
+    slack(
+      message: "New Android internal build uploaded! 🤖",
+      channel: "#mobile-releases",
+      success: true,
+      default_payloads: [:git_branch, :git_author, :last_git_commit_message]
+    )
+  end
+
+  desc "Deploy to alpha testing"
+  lane :alpha do
+    build_release
+    
+    upload_to_play_store(
+      track: 'alpha',
+      aab: lane_context[SharedValues::GRADLE_AAB_OUTPUT_PATH],
+      skip_upload_apk: true,
+      skip_upload_metadata: true,
+      skip_upload_changelogs: false,
+      skip_upload_images: true,
+      skip_upload_screenshots: true
+    )
+
+    slack(
+      message: "New Android alpha build uploaded! 🚀",
+      channel: "#mobile-releases",
+      success: true,
+      default_payloads: [:git_branch, :git_author, :last_git_commit_message]
+    )
+  end
+
+  desc "Deploy to beta testing"
+  lane :beta do
+    build_release
+    
+    upload_to_play_store(
+      track: 'beta',
+      aab: lane_context[SharedValues::GRADLE_AAB_OUTPUT_PATH],
+      skip_upload_apk: true,
+      skip_upload_metadata: false,
+      skip_upload_changelogs: false,
+      skip_upload_images: false,
+      skip_upload_screenshots: false
+    )
+
+    slack(
+      message: "New Android beta build uploaded! 🎯",
+      channel: "#mobile-releases",
+      success: true,
+      default_payloads: [:git_branch, :git_author, :last_git_commit_message]
+    )
+  end
+
+  # Production Deployment
+  desc "Deploy to Google Play Store"
+  lane :deploy_to_play_store do
+    build_release
+    
+    upload_to_play_store(
+      track: 'production',
+      aab: lane_context[SharedValues::GRADLE_AAB_OUTPUT_PATH],
+      skip_upload_apk: true,
+      skip_upload_metadata: false,
+      skip_upload_changelogs: false,
+      skip_upload_images: false,
+      skip_upload_screenshots: false,
+      release_status: 'draft' # Change to 'completed' for immediate release
+    )
+
+    slack(
+      message: "Android app successfully uploaded to Google Play Store! 🎉",
+      channel: "#mobile-releases",
+      success: true,
+      default_payloads: [:git_branch, :git_author, :last_git_commit_message]
+    )
+  end
+
+  # Firebase App Distribution
+  desc "Deploy to Firebase App Distribution"
+  lane :firebase do |options|
+    build_apk
+    
+    firebase_app_distribution(
+      app: ENV['FIREBASE_APP_ID_ANDROID'],
+      firebase_cli_token: ENV['FIREBASE_TOKEN'],
+      apk_path: lane_context[SharedValues::GRADLE_APK_OUTPUT_PATH],
+      groups: options[:groups] || "internal-testers",
+      release_notes: get_changelog_from_git_commits
+    )
+
+    slack(
+      message: "New Android build distributed via Firebase! 📱",
+      channel: "#mobile-releases",
+      success: true
+    )
+  end
+
+  # CodePush Integration
+  desc "Release CodePush update"
+  lane :codepush do |options|
+    deployment = options[:deployment] || "Staging"
+    description = options[:description] || "CodePush update via Fastlane"
+    
+    sh("cd .. && npx appcenter codepush release-react -a #{ENV['APPCENTER_APP_NAME_ANDROID']} -d #{deployment} --description '#{description}'")
+    
+    slack(
+      message: "CodePush update deployed to #{deployment}! 📱",
+      channel: "#mobile-releases",
+      success: true
+    )
+  end
+
+  # Maintenance Lanes
+  desc "Clean build artifacts"
+  lane :clean do
+    gradle(task: "clean")
+  end
+
+  desc "Update dependencies"
+  lane :update_dependencies do
+    gradle(task: "dependencies")
+  end
+
+  # Security and Validation
+  desc "Run security checks"
+  lane :security_check do
+    # Run lint security checks
+    gradle(task: "lintRelease")
+    
+    # Additional security scanning can be added here
+    # Example: MobSF, QARK, or other security tools
+  end
+
+  # Performance Testing
+  desc "Run performance tests"
+  lane :performance_test do
+    gradle(
+      task: "connectedAndroidTest",
+      build_type: "Release"
+    )
+  end
+
+  # Error handling
+  error do |lane, exception|
+    slack(
+      message: "Android build failed in lane: #{lane} 💥\nError: #{exception.message}",
+      channel: "#mobile-releases",
+      success: false
+    )
+  end
+
+  # Helper methods
+  private_lane :get_changelog_from_git_commits do
+    changelog_from_git_commits(
+      between: [ENV['GIT_PREVIOUS_SUCCESSFUL_COMMIT'] || "HEAD~10", "HEAD"],
+      pretty: "- %s",
+      date_format: "short",
+      match_lightweight_tag: false,
+      merge_commit_filtering: "exclude_merges"
+    )
+  end
+end

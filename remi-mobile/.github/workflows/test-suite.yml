@@ -1,0 +1,362 @@
+name: Comprehensive Test Suite
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  unit-tests:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: remi-mobile/package-lock.json
+
+      - name: Install dependencies
+        working-directory: remi-mobile
+        run: npm ci
+
+      - name: Run unit tests
+        working-directory: remi-mobile
+        run: npm run test:unit
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          file: remi-mobile/coverage/lcov.info
+          flags: unit-tests
+          name: unit-tests-coverage
+
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+
+    services:
+      redis:
+        image: redis:6-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: remi-mobile/package-lock.json
+
+      - name: Install dependencies
+        working-directory: remi-mobile
+        run: npm ci
+
+      - name: Run integration tests
+        working-directory: remi-mobile
+        run: npm run test:integration
+        env:
+          REDIS_URL: redis://localhost:6379
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          file: remi-mobile/coverage/lcov.info
+          flags: integration-tests
+          name: integration-tests-coverage
+
+  performance-tests:
+    name: Performance Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: remi-mobile/package-lock.json
+
+      - name: Install dependencies
+        working-directory: remi-mobile
+        run: npm ci
+
+      - name: Run performance tests
+        working-directory: remi-mobile
+        run: npm run test:performance
+
+      - name: Upload performance results
+        uses: actions/upload-artifact@v3
+        with:
+          name: performance-results
+          path: remi-mobile/test-results/performance-*.xml
+
+  visual-regression-tests:
+    name: Visual Regression Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: remi-mobile/package-lock.json
+
+      - name: Install dependencies
+        working-directory: remi-mobile
+        run: npm ci
+
+      - name: Run visual regression tests
+        working-directory: remi-mobile
+        run: npm run test:visual
+
+      - name: Upload visual diff artifacts
+        uses: actions/upload-artifact@v3
+        if: failure()
+        with:
+          name: visual-diffs
+          path: remi-mobile/__tests__/visual/diffs/
+
+  security-tests:
+    name: Security Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: remi-mobile/package-lock.json
+
+      - name: Install dependencies
+        working-directory: remi-mobile
+        run: npm ci
+
+      - name: Run security tests
+        working-directory: remi-mobile
+        run: npm run test:security
+
+      - name: Upload security scan results
+        uses: actions/upload-artifact@v3
+        with:
+          name: security-results
+          path: remi-mobile/test-results/security-*.xml
+
+  e2e-tests-ios:
+    name: E2E Tests (iOS)
+    runs-on: macos-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: remi-mobile/package-lock.json
+
+      - name: Setup Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.0'
+          bundler-cache: true
+          working-directory: remi-mobile/ios
+
+      - name: Install dependencies
+        working-directory: remi-mobile
+        run: npm ci
+
+      - name: Install CocoaPods
+        working-directory: remi-mobile/ios
+        run: pod install
+
+      - name: Build iOS app for testing
+        working-directory: remi-mobile
+        run: npm run e2e:build:ios
+
+      - name: Run iOS E2E tests
+        working-directory: remi-mobile
+        run: npm run e2e:ios
+
+      - name: Upload E2E test artifacts
+        uses: actions/upload-artifact@v3
+        if: failure()
+        with:
+          name: e2e-ios-artifacts
+          path: |
+            remi-mobile/e2e/artifacts/
+            remi-mobile/e2e/test-results/
+
+  e2e-tests-android:
+    name: E2E Tests (Android)
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: remi-mobile/package-lock.json
+
+      - name: Setup Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: '11'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v2
+
+      - name: Install dependencies
+        working-directory: remi-mobile
+        run: npm ci
+
+      - name: Build Android app for testing
+        working-directory: remi-mobile
+        run: npm run e2e:build:android
+
+      - name: Run Android E2E tests
+        working-directory: remi-mobile
+        run: npm run e2e:android
+
+      - name: Upload E2E test artifacts
+        uses: actions/upload-artifact@v3
+        if: failure()
+        with:
+          name: e2e-android-artifacts
+          path: |
+            remi-mobile/e2e/artifacts/
+            remi-mobile/e2e/test-results/
+
+  test-report:
+    name: Generate Test Report
+    runs-on: ubuntu-latest
+    needs:
+      [unit-tests, integration-tests, performance-tests, visual-regression-tests, security-tests]
+    if: always()
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Download all test artifacts
+        uses: actions/download-artifact@v3
+
+      - name: Generate comprehensive test report
+        run: |
+          mkdir -p test-reports
+
+          # Create summary report
+          cat > test-reports/summary.md << EOF
+          # Test Suite Summary - $(date)
+
+          ## Test Results
+
+          | Test Suite | Status | Coverage |
+          |------------|--------|----------|
+          | Unit Tests | ${{ needs.unit-tests.result }} | ![Coverage](https://img.shields.io/badge/coverage-check_artifacts-blue) |
+          | Integration Tests | ${{ needs.integration-tests.result }} | ![Coverage](https://img.shields.io/badge/coverage-check_artifacts-blue) |
+          | Performance Tests | ${{ needs.performance-tests.result }} | N/A |
+          | Visual Regression | ${{ needs.visual-regression-tests.result }} | N/A |
+          | Security Tests | ${{ needs.security-tests.result }} | N/A |
+
+          ## Artifacts
+
+          - Performance Results: Available in artifacts
+          - Visual Diffs: Available if tests failed
+          - Security Scan: Available in artifacts
+
+          ## Next Steps
+
+          ${{ needs.unit-tests.result == 'failure' && '- ❌ Fix unit test failures' || '- ✅ Unit tests passed' }}
+          ${{ needs.integration-tests.result == 'failure' && '- ❌ Fix integration test failures' || '- ✅ Integration tests passed' }}
+          ${{ needs.performance-tests.result == 'failure' && '- ❌ Address performance issues' || '- ✅ Performance tests passed' }}
+          ${{ needs.visual-regression-tests.result == 'failure' && '- ❌ Review visual changes' || '- ✅ Visual regression tests passed' }}
+          ${{ needs.security-tests.result == 'failure' && '- ❌ Address security vulnerabilities' || '- ✅ Security tests passed' }}
+          EOF
+
+      - name: Upload test report
+        uses: actions/upload-artifact@v3
+        with:
+          name: test-report
+          path: test-reports/
+
+      - name: Comment PR with test results
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const fs = require('fs');
+            const summary = fs.readFileSync('test-reports/summary.md', 'utf8');
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: summary
+            });
+
+  quality-gate:
+    name: Quality Gate
+    runs-on: ubuntu-latest
+    needs:
+      [unit-tests, integration-tests, performance-tests, visual-regression-tests, security-tests]
+    if: always()
+
+    steps:
+      - name: Check quality gate
+        run: |
+          echo "Checking quality gate..."
+
+          # Check if all required tests passed
+          if [[ "${{ needs.unit-tests.result }}" != "success" ]]; then
+            echo "❌ Unit tests failed"
+            exit 1
+          fi
+
+          if [[ "${{ needs.integration-tests.result }}" != "success" ]]; then
+            echo "❌ Integration tests failed"
+            exit 1
+          fi
+
+          if [[ "${{ needs.security-tests.result }}" != "success" ]]; then
+            echo "❌ Security tests failed"
+            exit 1
+          fi
+
+          # Performance and visual tests are warnings, not blockers
+          if [[ "${{ needs.performance-tests.result }}" != "success" ]]; then
+            echo "⚠️ Performance tests failed (warning)"
+          fi
+
+          if [[ "${{ needs.visual-regression-tests.result }}" != "success" ]]; then
+            echo "⚠️ Visual regression tests failed (warning)"
+          fi
+
+          echo "✅ Quality gate passed"

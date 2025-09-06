@@ -1,0 +1,216 @@
+# Fastfile for iOS deployment automation
+
+default_platform(:ios)
+
+platform :ios do
+  # Configuration
+  before_all do
+    setup_circle_ci if ENV['CI']
+    
+    # Ensure we have the latest version of Xcode command line tools
+    ensure_xcode_version(version: "15.0")
+    
+    # Clear derived data to ensure clean builds
+    clear_derived_data
+  end
+
+  # Development and Testing Lanes
+  desc "Run all tests"
+  lane :test do
+    run_tests(
+      workspace: "RemiMobile.xcworkspace",
+      scheme: "RemiMobile",
+      device: "iPhone 14",
+      clean: true,
+      code_coverage: true,
+      output_directory: "./test_output"
+    )
+  end
+
+  desc "Build for testing"
+  lane :build_for_testing do
+    build_app(
+      workspace: "RemiMobile.xcworkspace",
+      scheme: "RemiMobile",
+      configuration: "Debug",
+      destination: "generic/platform=iOS Simulator",
+      build_path: "./build",
+      derived_data_path: "./build/DerivedData",
+      clean: true,
+      skip_package_ipa: true
+    )
+  end
+
+  # Release Build Lanes
+  desc "Build release version"
+  lane :build_release do
+    # Increment build number
+    increment_build_number(
+      build_number: latest_testflight_build_number + 1,
+      xcodeproj: "RemiMobile.xcodeproj"
+    )
+
+    # Match certificates and provisioning profiles
+    match(
+      type: "appstore",
+      readonly: true,
+      keychain_name: "fastlane_tmp_keychain",
+      keychain_password: "temp_password"
+    )
+
+    # Build the app
+    build_app(
+      workspace: "RemiMobile.xcworkspace",
+      scheme: "RemiMobile",
+      configuration: "Release",
+      clean: true,
+      export_method: "app-store",
+      export_options: {
+        provisioningProfiles: {
+          "com.remi.mobile" => "match AppStore com.remi.mobile"
+        }
+      },
+      build_path: "./build",
+      output_directory: "./build/ipa"
+    )
+  end
+
+  # Beta Distribution
+  desc "Deploy to TestFlight"
+  lane :beta do
+    build_release
+    
+    # Upload to TestFlight
+    upload_to_testflight(
+      api_key_path: "fastlane/AuthKey.p8",
+      skip_waiting_for_build_processing: false,
+      changelog: get_changelog_from_git_commits,
+      groups: ["Internal Testing", "Beta Testers"],
+      notify_external_testers: true
+    )
+
+    # Notify team
+    slack(
+      message: "New iOS beta build uploaded to TestFlight! 🚀",
+      channel: "#mobile-releases",
+      success: true,
+      default_payloads: [:git_branch, :git_author, :last_git_commit_message]
+    )
+  end
+
+  # Production Deployment
+  desc "Deploy to App Store"
+  lane :deploy_to_app_store do
+    build_release
+    
+    # Upload to App Store Connect
+    upload_to_app_store(
+      api_key_path: "fastlane/AuthKey.p8",
+      force: true,
+      reject_if_possible: true,
+      skip_metadata: false,
+      skip_screenshots: false,
+      submit_for_review: true,
+      automatic_release: false,
+      submission_information: {
+        add_id_info_limits_tracking: true,
+        add_id_info_serves_ads: false,
+        add_id_info_tracks_action: true,
+        add_id_info_tracks_install: true,
+        add_id_info_uses_idfa: true,
+        content_rights_has_rights: true,
+        content_rights_contains_third_party_content: true,
+        export_compliance_platform: 'ios',
+        export_compliance_compliance_required: false,
+        export_compliance_encryption_updated: false,
+        export_compliance_app_type: nil,
+        export_compliance_uses_encryption: false,
+        export_compliance_is_exempt: false,
+        export_compliance_contains_third_party_cryptography: false,
+        export_compliance_contains_proprietary_cryptography: false,
+        export_compliance_available_on_french_store: false
+      }
+    )
+
+    # Notify team
+    slack(
+      message: "iOS app successfully submitted to App Store! 🎉",
+      channel: "#mobile-releases",
+      success: true,
+      default_payloads: [:git_branch, :git_author, :last_git_commit_message]
+    )
+  end
+
+  # Certificate Management
+  desc "Sync certificates and provisioning profiles"
+  lane :sync_certificates do
+    match(
+      type: "development",
+      force_for_new_devices: true
+    )
+    
+    match(
+      type: "appstore",
+      force_for_new_devices: true
+    )
+  end
+
+  desc "Register new devices"
+  lane :register_devices do
+    register_devices(
+      devices_file: "./fastlane/devices.txt"
+    )
+    
+    sync_certificates
+  end
+
+  # Maintenance Lanes
+  desc "Clean build artifacts"
+  lane :clean do
+    clear_derived_data
+    clean_build_artifacts
+  end
+
+  desc "Update dependencies"
+  lane :update_dependencies do
+    cocoapods(
+      clean_install: true,
+      podfile: "./Podfile"
+    )
+  end
+
+  # CodePush Integration
+  desc "Release CodePush update"
+  lane :codepush do |options|
+    deployment = options[:deployment] || "Staging"
+    description = options[:description] || "CodePush update via Fastlane"
+    
+    sh("cd .. && npx appcenter codepush release-react -a #{ENV['APPCENTER_APP_NAME_IOS']} -d #{deployment} --description '#{description}'")
+    
+    slack(
+      message: "CodePush update deployed to #{deployment}! 📱",
+      channel: "#mobile-releases",
+      success: true
+    )
+  end
+
+  # Error handling
+  error do |lane, exception|
+    slack(
+      message: "iOS build failed in lane: #{lane} 💥\nError: #{exception.message}",
+      channel: "#mobile-releases",
+      success: false
+    )
+  end
+
+  # Helper methods
+  private_lane :get_changelog_from_git_commits do
+    changelog_from_git_commits(
+      between: [ENV['GIT_PREVIOUS_SUCCESSFUL_COMMIT'] || "HEAD~10", "HEAD"],
+      pretty: "- %s",
+      date_format: "short",
+      match_lightweight_tag: false,
+      merge_commit_filtering: "exclude_merges"
+    )
+  end
+end

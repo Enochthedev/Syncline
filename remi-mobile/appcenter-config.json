@@ -1,0 +1,49 @@
+{
+    "app_secret": "YOUR_APP_SECRET_HERE",
+    "ios": {
+        "app_name": "remi-mobile-ios",
+        "owner_name": "your-org",
+        "deployment_keys": {
+            "staging": "YOUR_IOS_STAGING_DEPLOYMENT_KEY",
+            "production": "YOUR_IOS_PRODUCTION_DEPLOYMENT_KEY"
+        }
+    },
+    "android": {
+        "app_name": "remi-mobile-android",
+        "owner_name": "your-org",
+        "deployment_keys": {
+            "staging": "YOUR_ANDROID_STAGING_DEPLOYMENT_KEY",
+            "production": "YOUR_ANDROID_PRODUCTION_DEPLOYMENT_KEY"
+        }
+    },
+    "codepush": {
+        "check_frequency": "ON_APP_RESUME",
+        "install_mode": "ON_NEXT_RESTART",
+        "minimum_background_duration": 60000,
+        "update_dialog": {
+            "title": "Update Available",
+            "optional_update_message": "An update is available. Would you like to install it?",
+            "optional_ignore_button_label": "Later",
+            "optional_install_button_label": "Install"
+        }
+    },
+    "analytics": {
+        "firebase": {
+            "enabled": true,
+            "auto_collection": true
+        },
+        "crashlytics": {
+            "enabled": true,
+            "auto_collection": true
+        },
+        "performance": {
+            "enabled": true,
+            "auto_collection": true
+        }
+    },
+    "feature_flags": {
+        "endpoint": "https://flags.remi.com/api/flags",
+        "cache_duration": 300000,
+        "fallback_enabled": true
+    }
+}
