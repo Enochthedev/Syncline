@@ -1,26 +1,28 @@
-"""Contact insights service for AI-powered relationship analysis."""
+"""Enhanced contact insights service for AI-powered relationship analysis."""
 
 import logging
 from typing import List, Optional, Dict, Any, Tuple
 from uuid import UUID
 from datetime import datetime, timedelta
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_, func, desc, text
+from sqlalchemy import select, and_, or_, func, desc, text
 from sqlalchemy.orm import selectinload
 
 from db.models.unified_contact import UnifiedContact, ContactIdentity, ContactInsight
 from db.models.participant import Participant
 from db.models.message import Message
 from db.models.thread import Thread
+from .relationship_analyzer import RelationshipAnalyzer
 
 logger = logging.getLogger(__name__)
 
 
 class ContactInsightsService:
-    """Service for generating AI-powered contact insights and relationship analysis."""
+    """Enhanced service for generating AI-powered contact insights and relationship analysis."""
 
     def __init__(self, db_session: AsyncSession):
         self.db = db_session
+        self.relationship_analyzer = RelationshipAnalyzer(db_session)
 
     async def get_contact_insights(
         self,
@@ -470,3 +472,338 @@ class ContactInsightsService:
         # This would analyze common topics discussed
         # For now, return empty list as placeholder
         return []
+
+    async def get_comprehensive_relationship_analysis(
+        self,
+        contact_id: UUID,
+        tenant_id: UUID,
+        user_id: UUID
+    ) -> Dict[str, Any]:
+        """Get comprehensive relationship analysis including timeline, sentiment, and network."""
+        try:
+            # Get all relationship analysis data
+            timeline_data = await self.relationship_analyzer.analyze_communication_timeline(
+                contact_id, tenant_id, user_id
+            )
+
+            sentiment_data = await self.relationship_analyzer.analyze_sentiment_trends(
+                contact_id, tenant_id, user_id
+            )
+
+            frequency_data = await self.relationship_analyzer.calculate_interaction_frequency_analysis(
+                contact_id, tenant_id, user_id
+            )
+
+            network_data = await self.relationship_analyzer.analyze_mutual_connections(
+                contact_id, tenant_id, user_id
+            )
+
+            # Generate AI insights
+            ai_insights = await self.relationship_analyzer.generate_relationship_insights(
+                contact_id, tenant_id, user_id
+            )
+
+            return {
+                'timeline_analysis': timeline_data,
+                'sentiment_analysis': sentiment_data,
+                'frequency_analysis': frequency_data,
+                'network_analysis': network_data,
+                'ai_insights': ai_insights,
+                'generated_at': datetime.utcnow().isoformat()
+            }
+        except Exception as e:
+            logger.error(
+                f"Error generating comprehensive relationship analysis: {e}")
+            return {}
+
+    async def get_communication_timeline_visualization(
+        self,
+        contact_id: UUID,
+        tenant_id: UUID,
+        user_id: UUID,
+        days_back: int = 365
+    ) -> Dict[str, Any]:
+        """Get communication timeline data optimized for visualization."""
+        timeline_data = await self.relationship_analyzer.analyze_communication_timeline(
+            contact_id, tenant_id, user_id, days_back
+        )
+
+        if not timeline_data:
+            return {}
+
+        # Format data for frontend visualization
+        visualization_data = {
+            'timeline_chart': {
+                'data': timeline_data.get('timeline', []),
+                'chart_type': 'line',
+                'x_axis': 'date',
+                'y_axis': 'message_count',
+                'title': 'Communication Timeline'
+            },
+            'trend_analysis': timeline_data.get('trend_analysis', {}),
+            'summary_stats': timeline_data.get('summary', {}),
+            'patterns': timeline_data.get('patterns', {})
+        }
+
+        return visualization_data
+
+    async def get_interaction_heatmap_data(
+        self,
+        contact_id: UUID,
+        tenant_id: UUID,
+        user_id: UUID
+    ) -> Dict[str, Any]:
+        """Get interaction frequency data formatted for heatmap visualization."""
+        frequency_data = await self.relationship_analyzer.calculate_interaction_frequency_analysis(
+            contact_id, tenant_id, user_id
+        )
+
+        if not frequency_data:
+            return {}
+
+        # Format for heatmap (day of week vs hour of day)
+        hourly_pattern = frequency_data.get(
+            'hourly_pattern', {}).get('data', {})
+        weekly_pattern = frequency_data.get(
+            'weekly_pattern', {}).get('data', {})
+
+        # Create heatmap matrix (7 days x 24 hours)
+        heatmap_matrix = []
+        day_names = ['Sunday', 'Monday', 'Tuesday',
+                     'Wednesday', 'Thursday', 'Friday', 'Saturday']
+
+        for day_idx, day_name in enumerate(day_names):
+            day_data = []
+            for hour in range(24):
+                # This is simplified - in reality you'd need to query for day+hour combinations
+                base_count = weekly_pattern.get(day_name, 0) / 24
+                hour_multiplier = hourly_pattern.get(
+                    hour, 0) / max(hourly_pattern.values()) if hourly_pattern else 0
+                day_data.append(int(base_count * hour_multiplier))
+            heatmap_matrix.append(day_data)
+
+        return {
+            'heatmap_data': heatmap_matrix,
+            'day_labels': day_names,
+            'hour_labels': [f"{h:02d}:00" for h in range(24)],
+            'peak_times': {
+                'peak_hour': frequency_data.get('hourly_pattern', {}).get('peak_hour'),
+                'most_active_day': frequency_data.get('weekly_pattern', {}).get('most_active_day')
+            }
+        }
+
+    async def get_sentiment_trend_visualization(
+        self,
+        contact_id: UUID,
+        tenant_id: UUID,
+        user_id: UUID,
+        days_back: int = 90
+    ) -> Dict[str, Any]:
+        """Get sentiment trend data for visualization."""
+        sentiment_data = await self.relationship_analyzer.analyze_sentiment_trends(
+            contact_id, tenant_id, user_id, days_back
+        )
+
+        if not sentiment_data:
+            return {}
+
+        timeline = sentiment_data.get('sentiment_timeline', [])
+
+        return {
+            'sentiment_chart': {
+                'data': timeline,
+                'chart_type': 'area',
+                'x_axis': 'date',
+                'y_axis': 'avg_sentiment_score',
+                'title': 'Sentiment Trend Over Time'
+            },
+            'sentiment_distribution': {
+                'positive_avg': sum(day['positive_ratio'] for day in timeline) / len(timeline) if timeline else 0,
+                'neutral_avg': sum(day['neutral_ratio'] for day in timeline) / len(timeline) if timeline else 0,
+                'negative_avg': sum(day['negative_ratio'] for day in timeline) / len(timeline) if timeline else 0
+            },
+            'overall_sentiment': sentiment_data.get('overall_sentiment', 0),
+            'sentiment_category': sentiment_data.get('summary', {}).get('sentiment_category', 'neutral')
+        }
+
+    async def get_network_visualization_data(
+        self,
+        contact_id: UUID,
+        tenant_id: UUID,
+        user_id: UUID
+    ) -> Dict[str, Any]:
+        """Get network connection data for visualization."""
+        network_data = await self.relationship_analyzer.analyze_mutual_connections(
+            contact_id, tenant_id, user_id
+        )
+
+        if not network_data:
+            return {}
+
+        mutual_contacts = network_data.get('mutual_contacts', [])
+
+        # Format for network graph
+        nodes = [{'id': 'user', 'label': 'You', 'type': 'user'}]
+        edges = []
+
+        # Add the main contact
+        contact = await self._get_contact_with_data(contact_id, tenant_id, user_id)
+        if contact:
+            nodes.append({
+                'id': str(contact_id),
+                'label': contact.primary_name,
+                'type': 'main_contact'
+            })
+            edges.append({
+                'from': 'user',
+                'to': str(contact_id),
+                'weight': contact.relationship_strength or 0.5
+            })
+
+        # Add mutual connections
+        # Limit to top 10 for visualization
+        for mutual in mutual_contacts[:10]:
+            if mutual.get('unified_contact'):
+                node_id = mutual['unified_contact']['id']
+                nodes.append({
+                    'id': node_id,
+                    'label': mutual['unified_contact']['primary_name'],
+                    'type': 'mutual_contact'
+                })
+
+                # Add edges
+                edges.append({
+                    'from': 'user',
+                    'to': node_id,
+                    'weight': mutual['unified_contact'].get('relationship_strength', 0.3)
+                })
+                edges.append({
+                    'from': str(contact_id),
+                    'to': node_id,
+                    'weight': min(1.0, mutual['shared_threads'] / 10)
+                })
+
+        return {
+            'network_graph': {
+                'nodes': nodes,
+                'edges': edges
+            },
+            'network_stats': network_data.get('network_analysis', {}),
+            'mutual_contacts_list': mutual_contacts
+        }
+
+    async def refresh_all_insights(
+        self,
+        contact_id: UUID,
+        tenant_id: UUID,
+        user_id: UUID
+    ) -> Dict[str, Any]:
+        """Refresh all insights for a contact and return comprehensive analysis."""
+        try:
+            # Mark existing insights as inactive
+            await self._deactivate_existing_insights(contact_id)
+
+            # Generate new comprehensive analysis
+            comprehensive_analysis = await self.get_comprehensive_relationship_analysis(
+                contact_id, tenant_id, user_id
+            )
+
+            # Save new insights to database
+            ai_insights = comprehensive_analysis.get('ai_insights', [])
+            saved_insights = []
+
+            for insight_data in ai_insights:
+                insight = ContactInsight(
+                    unified_contact_id=contact_id,
+                    insight_type=insight_data['type'],
+                    title=insight_data['title'],
+                    description=insight_data['description'],
+                    confidence_score=insight_data['confidence'],
+                    supporting_data=insight_data['supporting_data'],
+                    suggested_actions=insight_data['suggested_actions']
+                )
+                self.db.add(insight)
+                saved_insights.append(insight)
+
+            await self.db.commit()
+
+            return {
+                'success': True,
+                'insights_generated': len(saved_insights),
+                'comprehensive_analysis': comprehensive_analysis
+            }
+
+        except Exception as e:
+            logger.error(
+                f"Error refreshing insights for contact {contact_id}: {e}")
+            await self.db.rollback()
+            return {
+                'success': False,
+                'error': str(e)
+            }
+
+    async def _deactivate_existing_insights(self, contact_id: UUID) -> None:
+        """Mark existing insights as inactive."""
+        from sqlalchemy import update
+
+        stmt = update(ContactInsight).where(
+            ContactInsight.unified_contact_id == contact_id
+        ).values(is_active=False)
+
+        await self.db.execute(stmt)
+
+    async def get_insight_accuracy_metrics(
+        self,
+        contact_id: UUID,
+        tenant_id: UUID,
+        user_id: UUID
+    ) -> Dict[str, Any]:
+        """Get metrics on insight accuracy based on user feedback."""
+        feedback_query = select(
+            ContactInsight.insight_type,
+            ContactInsight.user_feedback,
+            func.count(ContactInsight.id).label('count'),
+            func.avg(ContactInsight.confidence_score).label('avg_confidence')
+        ).join(UnifiedContact).where(
+            and_(
+                UnifiedContact.id == contact_id,
+                UnifiedContact.tenant_id == tenant_id,
+                UnifiedContact.user_id == user_id,
+                ContactInsight.user_feedback.isnot(None)
+            )
+        ).group_by(
+            ContactInsight.insight_type,
+            ContactInsight.user_feedback
+        )
+
+        feedback_result = await self.db.execute(feedback_query)
+        feedback_data = feedback_result.fetchall()
+
+        # Process feedback metrics
+        accuracy_metrics = {}
+        for row in feedback_data:
+            insight_type = row.insight_type
+            if insight_type not in accuracy_metrics:
+                accuracy_metrics[insight_type] = {
+                    'helpful': 0,
+                    'not_helpful': 0,
+                    'incorrect': 0,
+                    'total': 0,
+                    'avg_confidence': 0
+                }
+
+            accuracy_metrics[insight_type][row.user_feedback] = row.count
+            accuracy_metrics[insight_type]['total'] += row.count
+            accuracy_metrics[insight_type]['avg_confidence'] = row.avg_confidence
+
+        # Calculate accuracy percentages
+        for insight_type, metrics in accuracy_metrics.items():
+            if metrics['total'] > 0:
+                metrics['accuracy_rate'] = (
+                    metrics['helpful'] / metrics['total']
+                )
+                metrics['error_rate'] = (
+                    metrics['incorrect'] / metrics['total']
+                )
+
+        return accuracy_metrics

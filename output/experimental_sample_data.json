@@ -1,0 +1,186 @@
+{
+  "tiktok": [
+    {
+      "id": "9eac0cf9-e87f-4e86-b41e-1f3ad62ff292",
+      "platform": "tiktok",
+      "content": {
+        "text": "Check out this amazing video! #0 #trending #tiktok",
+        "video_url": "https://tiktok.com/video/mock_0",
+        "duration": 30,
+        "likes": 100,
+        "shares": 10,
+        "comments": 5
+      },
+      "metadata": {
+        "mock": true,
+        "content_type": "video",
+        "user": {
+          "id": "user1",
+          "username": "@creator_user",
+          "display_name": "Creative User"
+        },
+        "platform_features": {
+          "hashtags": true,
+          "mentions": true,
+          "video_support": true,
+          "effects": true
+        }
+      },
+      "timestamp": "2025-08-18T06:10:51.977014+00:00"
+    },
+    {
+      "id": "26400259-c84c-46a6-998b-219dd0d13d2a",
+      "platform": "tiktok",
+      "content": {
+        "text": "Great content! Love this video #1",
+        "parent_video_id": "video_1",
+        "likes": 6
+      },
+      "metadata": {
+        "mock": true,
+        "content_type": "comment",
+        "user": {
+          "id": "user2",
+          "username": "@business_acc",
+          "display_name": "Business Account"
+        },
+        "platform_features": {
+          "hashtags": true,
+          "mentions": true,
+          "video_support": true,
+          "effects": true
+        }
+      },
+      "timestamp": "2025-08-18T05:10:51.977014+00:00"
+    },
+    {
+      "id": "5cc0d8ce-5ab4-420f-b331-346713040c2c",
+      "platform": "tiktok",
+      "content": {
+        "text": "Hey! Loved your recent video. Want to collaborate? Message 2",
+        "is_private": true
+      },
+      "metadata": {
+        "mock": true,
+        "content_type": "direct_message",
+        "user": {
+          "id": "user3",
+          "username": "@influencer",
+          "display_name": "Top Influencer"
+        },
+        "platform_features": {
+          "hashtags": true,
+          "mentions": true,
+          "video_support": true,
+          "effects": true
+        }
+      },
+      "timestamp": "2025-08-18T04:10:51.977014+00:00"
+    }
+  ],
+  "snapchat": [
+    {
+      "id": "e69f3af6-e287-47b2-95a0-266d922fb2ce",
+      "platform": "snapchat",
+      "content": {
+        "type": "image",
+        "duration": 10,
+        "caption": "Check this out! Snap #0",
+        "filters": [
+          "dog_filter",
+          "rainbow"
+        ],
+        "viewed": false,
+        "screenshot": true,
+        "expires_at": "2025-08-19T06:10:51.977391+00:00"
+      },
+      "metadata": {
+        "mock": true,
+        "content_type": "snap",
+        "user": {
+          "id": "user1",
+          "username": "snap_friend1",
+          "display_name": "Best Friend"
+        },
+        "platform_features": {
+          "ephemeral": true,
+          "filters": true,
+          "bitmoji": true,
+          "location": true,
+          "stories": true
+        },
+        "privacy": {
+          "ephemeral": true,
+          "screenshot_notification": true,
+          "view_tracking": true
+        }
+      },
+      "timestamp": "2025-08-18T06:10:51.977391+00:00"
+    },
+    {
+      "id": "8f001cc4-5c5c-4bb5-a630-91c41980c6ad",
+      "platform": "snapchat",
+      "content": {
+        "text": "Hey! What's up? Message 1",
+        "delivered": true,
+        "read": true,
+        "typing_indicator": false
+      },
+      "metadata": {
+        "mock": true,
+        "content_type": "chat",
+        "user": {
+          "id": "user2",
+          "username": "snap_friend2",
+          "display_name": "College Buddy"
+        },
+        "platform_features": {
+          "ephemeral": true,
+          "filters": true,
+          "bitmoji": true,
+          "location": true,
+          "stories": true
+        },
+        "privacy": {
+          "ephemeral": false,
+          "screenshot_notification": true,
+          "view_tracking": true
+        }
+      },
+      "timestamp": "2025-08-18T06:05:51.977391+00:00"
+    },
+    {
+      "id": "dad4d32b-f703-4e96-a12a-c734b81b5ab4",
+      "platform": "snapchat",
+      "content": {
+        "type": "image",
+        "caption": "My day story #2",
+        "views": 16,
+        "expires_at": "2025-08-19T06:10:51.977391+00:00",
+        "location": null
+      },
+      "metadata": {
+        "mock": true,
+        "content_type": "story",
+        "user": {
+          "id": "user3",
+          "username": "snap_creator",
+          "display_name": "Content Creator"
+        },
+        "platform_features": {
+          "ephemeral": true,
+          "filters": true,
+          "bitmoji": true,
+          "location": true,
+          "stories": true
+        },
+        "privacy": {
+          "ephemeral": true,
+          "screenshot_notification": true,
+          "view_tracking": true
+        }
+      },
+      "timestamp": "2025-08-18T06:00:51.977391+00:00"
+    }
+  ]
+}

@@ -1,0 +1,181 @@
+{
+    "dashboard": {
+        "id": null,
+        "title": "MESH Platform Connectors",
+        "tags": [
+            "mesh",
+            "connectors",
+            "platforms"
+        ],
+        "style": "dark",
+        "timezone": "browser",
+        "refresh": "30s",
+        "time": {
+            "from": "now-1h",
+            "to": "now"
+        },
+        "panels": [
+            {
+                "id": 1,
+                "title": "Connector Health Matrix",
+                "type": "heatmap",
+                "targets": [
+                    {
+                        "expr": "mesh_connector_health",
+                        "legendFormat": "{{platform}}"
+                    }
+                ],
+                "gridPos": {
+                    "h": 8,
+                    "w": 24,
+                    "x": 0,
+                    "y": 0
+                }
+            },
+            {
+                "id": 2,
+                "title": "Message Ingestion by Platform",
+                "type": "graph",
+                "targets": [
+                    {
+                        "expr": "rate(mesh_messages_ingested_total{status=\"success\"}[5m])",
+                        "legendFormat": "{{platform}}"
+                    }
+                ],
+                "yAxes": [
+                    {
+                        "label": "Messages/sec",
+                        "min": 0
+                    }
+                ],
+                "gridPos": {
+                    "h": 8,
+                    "w": 12,
+                    "x": 0,
+                    "y": 8
+                }
+            },
+            {
+                "id": 3,
+                "title": "Message Ingestion Errors",
+                "type": "graph",
+                "targets": [
+                    {
+                        "expr": "rate(mesh_messages_ingested_total{status!=\"success\"}[5m])",
+                        "legendFormat": "{{platform}} - {{status}}"
+                    }
+                ],
+                "yAxes": [
+                    {
+                        "label": "Errors/sec",
+                        "min": 0
+                    }
+                ],
+                "gridPos": {
+                    "h": 8,
+                    "w": 12,
+                    "x": 12,
+                    "y": 8
+                }
+            },
+            {
+                "id": 4,
+                "title": "Connector Operations",
+                "type": "graph",
+                "targets": [
+                    {
+                        "expr": "rate(mesh_connector_operations_total[5m])",
+                        "legendFormat": "{{platform}} - {{operation}} - {{status}}"
+                    }
+                ],
+                "yAxes": [
+                    {
+                        "label": "Operations/sec",
+                        "min": 0
+                    }
+                ],
+                "gridPos": {
+                    "h": 8,
+                    "w": 12,
+                    "x": 0,
+                    "y": 16
+                }
+            },
+            {
+                "id": 5,
+                "title": "Message Ingestion Latency",
+                "type": "graph",
+                "targets": [
+                    {
+                        "expr": "histogram_quantile(0.95, rate(mesh_message_ingestion_duration_seconds_bucket[5m]))",
+                        "legendFormat": "95th percentile - {{platform}}"
+                    },
+                    {
+                        "expr": "histogram_quantile(0.50, rate(mesh_message_ingestion_duration_seconds_bucket[5m]))",
+                        "legendFormat": "50th percentile - {{platform}}"
+                    }
+                ],
+                "yAxes": [
+                    {
+                        "label": "Seconds",
+                        "min": 0
+                    }
+                ],
+                "gridPos": {
+                    "h": 8,
+                    "w": 12,
+                    "x": 12,
+                    "y": 16
+                }
+            },
+            {
+                "id": 6,
+                "title": "Total Messages by Platform",
+                "type": "stat",
+                "targets": [
+                    {
+                        "expr": "mesh_total_messages",
+                        "legendFormat": "{{platform}}"
+                    }
+                ],
+                "fieldConfig": {
+                    "defaults": {
+                        "color": {
+                            "mode": "palette-classic"
+                        }
+                    }
+                },
+                "gridPos": {
+                    "h": 8,
+                    "w": 12,
+                    "x": 0,
+                    "y": 24
+                }
+            },
+            {
+                "id": 7,
+                "title": "Total Threads by Platform",
+                "type": "stat",
+                "targets": [
+                    {
+                        "expr": "mesh_total_threads",
+                        "legendFormat": "{{platform}}"
+                    }
+                ],
+                "fieldConfig": {
+                    "defaults": {
+                        "color": {
+                            "mode": "palette-classic"
+                        }
+                    }
+                },
+                "gridPos": {
+                    "h": 8,
+                    "w": 12,
+                    "x": 12,
+                    "y": 24
+                }
+            }
+        ]
+    }
+}

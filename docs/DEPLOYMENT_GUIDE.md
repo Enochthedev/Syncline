@@ -1,609 +1,577 @@
-# MESH Ingestion System - Deployment Guide
+# MESH System Deployment Guide
 
-## Overview
-This guide covers deployment, configuration, and operational procedures for the MESH Ingestion System.
+This guide covers deploying the MESH Ingestion System in various environments using Docker, Kubernetes, and Helm.
 
 ## Table of Contents
+
 - [Prerequisites](#prerequisites)
 - [Environment Setup](#environment-setup)
-- [Database Setup](#database-setup)
-- [Redis Configuration](#redis-configuration)
-- [Application Deployment](#application-deployment)
-- [Platform Configuration](#platform-configuration)
+- [Docker Deployment](#docker-deployment)
+- [Kubernetes Deployment](#kubernetes-deployment)
+- [Helm Deployment](#helm-deployment)
+- [Configuration](#configuration)
 - [Monitoring Setup](#monitoring-setup)
-- [Backup & Recovery](#backup--recovery)
 - [Troubleshooting](#troubleshooting)
 
 ## Prerequisites
 
 ### System Requirements
-- **OS**: Linux (Ubuntu 20.04+ recommended) or macOS
-- **Python**: 3.11 or higher
-- **Memory**: 4GB minimum, 8GB recommended
-- **Storage**: 50GB minimum for logs and data
-- **Network**: Outbound HTTPS access for platform APIs
+
+**Minimum Requirements:**
+- CPU: 4 cores
+- RAM: 8GB
+- Storage: 100GB SSD
+- Network: 1Gbps
+
+**Recommended for Production:**
+- CPU: 8+ cores
+- RAM: 16GB+
+- Storage: 500GB+ NVMe SSD
+- Network: 10Gbps
+- GPU: Optional for AI processing acceleration
+
+### Software Dependencies
+
+- Docker 24.0+
+- Docker Compose 2.20+
+- Kubernetes 1.28+
+- Helm 3.12+
+- kubectl 1.28+
 
 ### External Services
-- **PostgreSQL**: 14.0 or higher
-- **Redis**: 6.0 or higher
-- **Google Cloud Project**: For Gmail integration
-- **SSL Certificate**: For webhook endpoints (production)
+
+- PostgreSQL 16+ (or managed database)
+- Redis 7+ (or managed cache)
+- ChromaDB (vector database)
+- Optional: Ollama for local AI processing
 
 ## Environment Setup
 
-### 1. Create Application User
+### 1. Clone Repository
+
 ```bash
-# Create dedicated user
-sudo useradd -m -s /bin/bash mesh
-sudo usermod -aG sudo mesh
-
-# Switch to application user
-sudo su - mesh
-```
-
-### 2. Install Python Dependencies
-```bash
-# Install Python 3.11
-sudo apt update
-sudo apt install python3.11 python3.11-venv python3.11-dev
-
-# Create virtual environment
-python3.11 -m venv /home/mesh/venv
-source /home/mesh/venv/bin/activate
-
-# Upgrade pip
-pip install --upgrade pip
-```
-
-### 3. Clone Repository
-```bash
-cd /home/mesh
 git clone https://github.com/your-org/mesh-ingestion-system.git
 cd mesh-ingestion-system
-
-# Install dependencies
-pip install -r requirements.txt
 ```
 
-## Database Setup
+### 2. Environment Configuration
 
-### 1. PostgreSQL Installation
 ```bash
-# Install PostgreSQL
-sudo apt install postgresql postgresql-contrib
+# Copy environment template
+cp .env.example .env
 
-# Start and enable service
-sudo systemctl start postgresql
-sudo systemctl enable postgresql
+# Edit configuration
+nano .env
 ```
 
-### 2. Database Configuration
+### 3. Required Environment Variables
+
 ```bash
-# Switch to postgres user
-sudo su - postgres
-
-# Create database and user
-createdb mesh_production
-createuser --interactive mesh_user
-
-# Set password
-psql -c "ALTER USER mesh_user PASSWORD 'secure_password_here';"
-
-# Grant permissions
-psql -c "GRANT ALL PRIVILEGES ON DATABASE mesh_production TO mesh_user;"
-```
-
-### 3. Database Tuning
-Edit `/etc/postgresql/14/main/postgresql.conf`:
-```ini
-# Memory settings
-shared_buffers = 256MB
-effective_cache_size = 1GB
-work_mem = 4MB
-maintenance_work_mem = 64MB
-
-# Connection settings
-max_connections = 100
-listen_addresses = 'localhost'
-
-# Performance settings
-checkpoint_completion_target = 0.9
-wal_buffers = 16MB
-default_statistics_target = 100
-```
-
-### 4. Run Migrations
-```bash
-# Set database URL
-export DATABASE_URL="postgresql://mesh_user:secure_password_here@localhost/mesh_production"
-
-# Run migrations
-alembic upgrade head
-```
-
-## Redis Configuration
-
-### 1. Redis Installation
-```bash
-# Install Redis
-sudo apt install redis-server
-
-# Configure Redis
-sudo nano /etc/redis/redis.conf
-```
-
-### 2. Redis Configuration
-Edit `/etc/redis/redis.conf`:
-```ini
-# Memory settings
-maxmemory 512mb
-maxmemory-policy allkeys-lru
-
-# Persistence
-save 900 1
-save 300 10
-save 60 10000
-
-# Security
-requirepass your_redis_password_here
-bind 127.0.0.1
-
-# Logging
-loglevel notice
-logfile /var/log/redis/redis-server.log
-```
-
-### 3. Start Redis
-```bash
-sudo systemctl restart redis-server
-sudo systemctl enable redis-server
-```
-
-## Application Deployment
-
-### 1. Environment Configuration
-Create `/home/mesh/mesh-ingestion-system/.env`:
-```bash
-# Environment
-ENV=production
-DEBUG=false
-
 # Database
-DATABASE_URL=postgresql://mesh_user:secure_password_here@localhost/mesh_production
-DB_POOL_SIZE=20
-DB_MAX_OVERFLOW=30
-DB_POOL_PRE_PING=true
+DATABASE_URL=postgresql+asyncpg://user:password@host:5432/database
+POSTGRES_PASSWORD=secure_password
 
 # Redis
-REDIS_URL=redis://:your_redis_password_here@localhost:6379
+REDIS_URL=redis://host:6379
 
-# Gmail Configuration
-GMAIL_SCOPES="https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.modify"
-GMAIL_CREDENTIALS_FILE="/home/mesh/config/gmail_credentials.json"
-GMAIL_TOKEN_FILE="/home/mesh/config/gmail_token.json"
-GMAIL_WEBHOOK_ENDPOINT="/webhooks/gmail"
-GMAIL_WEBHOOK_SECRET="your_webhook_secret_here"
-GMAIL_TOPIC_NAME="projects/your-project/topics/gmail-push"
+# Vector Database
+CHROMA_HOST=chromadb-host
+CHROMA_PORT=8000
+
+# Platform Credentials
+GMAIL_CLIENT_ID=your_gmail_client_id
+GMAIL_CLIENT_SECRET=your_gmail_client_secret
+SLACK_CLIENT_ID=your_slack_client_id
+SLACK_CLIENT_SECRET=your_slack_client_secret
+DISCORD_BOT_TOKEN=your_discord_bot_token
+TWITTER_API_KEY=your_twitter_api_key
+TWITTER_API_SECRET=your_twitter_api_secret
+TELEGRAM_BOT_TOKEN=your_telegram_bot_token
+
+# AI Services (Optional)
+OPENAI_API_KEY=your_openai_key
+ANTHROPIC_API_KEY=your_anthropic_key
+OLLAMA_BASE_URL=http://ollama:11434
 
 # Security
-TOKEN_ENCRYPTION_KEY="your_32_byte_encryption_key_here"
-
-# Logging
-LOG_LEVEL=INFO
-LOG_FILE="/var/log/mesh/application.log"
+JWT_SECRET_KEY=your_jwt_secret
+ENCRYPTION_KEY=your_encryption_key
 ```
 
-### 2. Create Systemd Service
-Create `/etc/systemd/system/mesh-ingestion.service`:
-```ini
-[Unit]
-Description=MESH Ingestion System
-After=network.target postgresql.service redis.service
-Requires=postgresql.service redis.service
+## Docker Deployment
 
-[Service]
-Type=simple
-User=mesh
-Group=mesh
-WorkingDirectory=/home/mesh/mesh-ingestion-system
-Environment=PATH=/home/mesh/venv/bin
-ExecStart=/home/mesh/venv/bin/python main.py
-ExecReload=/bin/kill -HUP $MAINPID
-Restart=always
-RestartSec=10
+### Development Environment
 
-# Resource limits
-LimitNOFILE=65536
-MemoryMax=2G
-
-# Logging
-StandardOutput=journal
-StandardError=journal
-SyslogIdentifier=mesh-ingestion
-
-[Install]
-WantedBy=multi-user.target
-```
-
-### 3. Create Log Directory
 ```bash
-sudo mkdir -p /var/log/mesh
-sudo chown mesh:mesh /var/log/mesh
+# Start all services
+docker-compose up -d
+
+# View logs
+docker-compose logs -f
+
+# Stop services
+docker-compose down
 ```
 
-### 4. Start Application
+### Production Environment
+
 ```bash
-# Reload systemd
-sudo systemctl daemon-reload
+# Use production compose file
+docker-compose -f docker-compose.prod.yml up -d
 
-# Enable and start service
-sudo systemctl enable mesh-ingestion
-sudo systemctl start mesh-ingestion
+# Scale API service
+docker-compose -f docker-compose.prod.yml up -d --scale api=3
 
-# Check status
-sudo systemctl status mesh-ingestion
+# Update services
+docker-compose -f docker-compose.prod.yml pull
+docker-compose -f docker-compose.prod.yml up -d
 ```
 
-## Platform Configuration
+### Service Health Checks
 
-### Gmail Setup
+```bash
+# Check service status
+docker-compose ps
 
-#### 1. Google Cloud Project
-1. Create or select a Google Cloud Project
-2. Enable the Gmail API
+# API health check
+curl http://localhost:8000/api/v1/health
+
+# Database connection test
+docker-compose exec postgres pg_isready
+
+# Redis connection test
+docker-compose exec redis redis-cli ping
+```
+
+## Kubernetes Deployment
+
+### 1. Cluster Setup
+
+```bash
+# Verify cluster access
+kubectl cluster-info
+
+# Create namespace
+kubectl apply -f k8s/namespace.yaml
+```
+
+### 2. Storage Classes
+
+```bash
+# Create storage classes (example for AWS EKS)
+cat <<EOF | kubectl apply -f -
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: fast-ssd
+provisioner: ebs.csi.aws.com
+parameters:
+  type: gp3
+  iops: "3000"
+  throughput: "125"
+volumeBindingMode: WaitForFirstConsumer
+allowVolumeExpansion: true
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: nfs-storage
+provisioner: efs.csi.aws.com
+volumeBindingMode: Immediate
+allowVolumeExpansion: true
+EOF
+```
+
+### 3. Deploy Infrastructure
+
+```bash
+# Deploy in order
+kubectl apply -f k8s/configmap.yaml
+kubectl apply -f k8s/storage.yaml
+kubectl apply -f k8s/postgres.yaml
+kubectl apply -f k8s/redis.yaml
+kubectl apply -f k8s/chromadb.yaml
+
+# Wait for databases to be ready
+kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=postgres -n mesh-system --timeout=300s
+kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=redis -n mesh-system --timeout=300s
+kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=chromadb -n mesh-system --timeout=300s
+```
+
+### 4. Deploy Application Services
+
+```bash
+# Deploy application components
+kubectl apply -f k8s/api.yaml
+kubectl apply -f k8s/worker.yaml
+kubectl apply -f k8s/ai-processor.yaml
+kubectl apply -f k8s/connectors.yaml
+
+# Deploy ingress
+kubectl apply -f k8s/ingress.yaml
+
+# Check deployment status
+kubectl get pods -n mesh-system
+kubectl get services -n mesh-system
+kubectl get ingress -n mesh-system
+```
+
+### 5. Database Migration
+
+```bash
+# Run migrations
+kubectl exec -it deployment/mesh-api -n mesh-system -- alembic upgrade head
+```
+
+## Helm Deployment
+
+### 1. Add Helm Repositories
+
+```bash
+# Add required repositories
+helm repo add bitnami https://charts.bitnami.com/bitnami
+helm repo update
+```
+
+### 2. Install Dependencies
+
+```bash
+# Install PostgreSQL
+helm install postgres bitnami/postgresql \
+  --namespace mesh-system \
+  --create-namespace \
+  --set auth.postgresPassword=secure_password \
+  --set auth.username=mesh_user \
+  --set auth.password=secure_password \
+  --set auth.database=mesh_production
+
+# Install Redis
+helm install redis bitnami/redis \
+  --namespace mesh-system \
+  --set auth.enabled=false \
+  --set master.persistence.size=10Gi
+```
+
+### 3. Deploy MESH System
+
+```bash
+# Install with default values
+helm install mesh-system ./helm/mesh-system \
+  --namespace mesh-system \
+  --create-namespace
+
+# Install with custom values
+helm install mesh-system ./helm/mesh-system \
+  --namespace mesh-system \
+  --create-namespace \
+  --values custom-values.yaml
+
+# Upgrade deployment
+helm upgrade mesh-system ./helm/mesh-system \
+  --namespace mesh-system \
+  --values custom-values.yaml
+```
+
+### 4. Custom Values Example
+
+```yaml
+# custom-values.yaml
+api:
+  replicaCount: 3
+  resources:
+    requests:
+      memory: "1Gi"
+      cpu: "500m"
+    limits:
+      memory: "2Gi"
+      cpu: "1"
+
+ingress:
+  enabled: true
+  hosts:
+    - host: mesh.yourdomain.com
+      paths:
+        - path: /
+          pathType: Prefix
+
+secrets:
+  postgresPassword: "your_secure_password"
+  gmail:
+    clientId: "your_gmail_client_id"
+    clientSecret: "your_gmail_client_secret"
+```
+
+## Configuration
+
+### Platform Integration Setup
+
+#### Gmail Integration
+
+1. Create Google Cloud Project
+2. Enable Gmail API
 3. Create OAuth 2.0 credentials
-4. Download credentials JSON file
+4. Configure redirect URIs
+5. Set environment variables
 
-#### 2. OAuth Credentials
 ```bash
-# Copy credentials file
-cp ~/Downloads/credentials.json /home/mesh/config/gmail_credentials.json
-chown mesh:mesh /home/mesh/config/gmail_credentials.json
-chmod 600 /home/mesh/config/gmail_credentials.json
+GMAIL_CLIENT_ID=your_client_id
+GMAIL_CLIENT_SECRET=your_client_secret
 ```
 
-#### 3. Push Notifications Setup
+#### Slack Integration
+
+1. Create Slack App
+2. Configure OAuth scopes
+3. Enable Events API
+4. Set webhook URLs
+5. Install app to workspace
+
 ```bash
-# Create Pub/Sub topic
-gcloud pubsub topics create gmail-push
-
-# Create subscription
-gcloud pubsub subscriptions create gmail-push-sub --topic=gmail-push
-
-# Set up webhook endpoint
-# Configure your domain to point to the application
+SLACK_CLIENT_ID=your_client_id
+SLACK_CLIENT_SECRET=your_client_secret
 ```
 
-#### 4. Initial Authentication
+#### Discord Integration
+
+1. Create Discord Application
+2. Create Bot user
+3. Configure permissions
+4. Get bot token
+
 ```bash
-# Run initial OAuth flow (interactive)
-cd /home/mesh/mesh-ingestion-system
-source /home/mesh/venv/bin/activate
-python -c "
-from integrations.gmail_factory import setup_gmail_integration
-import asyncio
-asyncio.run(setup_gmail_integration())
-"
+DISCORD_BOT_TOKEN=your_bot_token
 ```
 
-## Reverse Proxy Setup (Nginx)
+### AI Service Configuration
 
-### 1. Install Nginx
+#### Local AI with Ollama
+
 ```bash
-sudo apt install nginx
+# Pull required models
+docker exec ollama ollama pull tinyllama:latest
+docker exec ollama ollama pull nomic-embed-text:latest
+
+# Verify models
+docker exec ollama ollama list
 ```
 
-### 2. Configure Nginx
-Create `/etc/nginx/sites-available/mesh-ingestion`:
-```nginx
-server {
-    listen 80;
-    server_name your-domain.com;
-    
-    # Redirect HTTP to HTTPS
-    return 301 https://$server_name$request_uri;
-}
+#### Cloud AI Services
 
-server {
-    listen 443 ssl http2;
-    server_name your-domain.com;
-    
-    # SSL Configuration
-    ssl_certificate /etc/letsencrypt/live/your-domain.com/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/your-domain.com/privkey.pem;
-    ssl_protocols TLSv1.2 TLSv1.3;
-    ssl_ciphers ECDHE-RSA-AES256-GCM-SHA512:DHE-RSA-AES256-GCM-SHA512;
-    
-    # Security headers
-    add_header X-Frame-Options DENY;
-    add_header X-Content-Type-Options nosniff;
-    add_header X-XSS-Protection "1; mode=block";
-    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains";
-    
-    # Proxy to application
-    location / {
-        proxy_pass http://127.0.0.1:8000;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        
-        # Timeouts
-        proxy_connect_timeout 60s;
-        proxy_send_timeout 60s;
-        proxy_read_timeout 60s;
-    }
-    
-    # Webhook endpoints (higher limits)
-    location /webhooks/ {
-        proxy_pass http://127.0.0.1:8000;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        
-        # Increased limits for webhooks
-        client_max_body_size 10M;
-        proxy_connect_timeout 30s;
-        proxy_send_timeout 30s;
-        proxy_read_timeout 30s;
-    }
-    
-    # Health check endpoint
-    location /health {
-        proxy_pass http://127.0.0.1:8000;
-        access_log off;
-    }
-}
-```
-
-### 3. Enable Site
 ```bash
-sudo ln -s /etc/nginx/sites-available/mesh-ingestion /etc/nginx/sites-enabled/
-sudo nginx -t
-sudo systemctl reload nginx
+# OpenAI configuration
+OPENAI_API_KEY=your_openai_key
+
+# Anthropic configuration
+ANTHROPIC_API_KEY=your_anthropic_key
 ```
 
 ## Monitoring Setup
 
-### 1. Log Rotation
-Create `/etc/logrotate.d/mesh-ingestion`:
-```
-/var/log/mesh/*.log {
-    daily
-    missingok
-    rotate 30
-    compress
-    delaycompress
-    notifempty
-    create 644 mesh mesh
-    postrotate
-        systemctl reload mesh-ingestion
-    endscript
-}
-```
+### 1. Deploy Monitoring Stack
 
-### 2. Health Check Script
-Create `/home/mesh/scripts/health_check.sh`:
 ```bash
-#!/bin/bash
+# Deploy Prometheus and Grafana
+docker-compose -f monitoring/docker-compose.monitoring.yml up -d
 
-HEALTH_URL="http://localhost:8000/health"
-TIMEOUT=10
-
-response=$(curl -s -w "%{http_code}" -o /dev/null --max-time $TIMEOUT "$HEALTH_URL")
-
-if [ "$response" = "200" ]; then
-    echo "$(date): Health check passed"
-    exit 0
-else
-    echo "$(date): Health check failed (HTTP $response)"
-    exit 1
-fi
+# Or use Helm
+helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+helm install monitoring prometheus-community/kube-prometheus-stack \
+  --namespace monitoring \
+  --create-namespace
 ```
 
-### 3. Cron Job for Health Checks
-```bash
-# Add to crontab
-crontab -e
+### 2. Configure Dashboards
 
-# Add this line (check every 5 minutes)
-*/5 * * * * /home/mesh/scripts/health_check.sh >> /var/log/mesh/health_check.log 2>&1
+```bash
+# Import Grafana dashboards
+kubectl apply -f monitoring/grafana/dashboards/
 ```
 
-### 4. System Metrics Collection
-Install and configure monitoring tools:
+### 3. Set Up Alerts
+
 ```bash
-# Install htop for system monitoring
-sudo apt install htop
-
-# Install netdata for real-time metrics (optional)
-bash <(curl -Ss https://my-netdata.io/kickstart.sh)
-```
-
-## Backup & Recovery
-
-### 1. Database Backup
-Create `/home/mesh/scripts/backup_db.sh`:
-```bash
-#!/bin/bash
-
-BACKUP_DIR="/home/mesh/backups"
-DATE=$(date +%Y%m%d_%H%M%S)
-DB_NAME="mesh_production"
-DB_USER="mesh_user"
-
-mkdir -p $BACKUP_DIR
-
-# Create backup
-pg_dump -h localhost -U $DB_USER -d $DB_NAME | gzip > $BACKUP_DIR/mesh_db_$DATE.sql.gz
-
-# Keep only last 7 days of backups
-find $BACKUP_DIR -name "mesh_db_*.sql.gz" -mtime +7 -delete
-
-echo "$(date): Database backup completed: mesh_db_$DATE.sql.gz"
-```
-
-### 2. Configuration Backup
-```bash
-#!/bin/bash
-
-BACKUP_DIR="/home/mesh/backups"
-DATE=$(date +%Y%m%d_%H%M%S)
-
-# Backup configuration files
-tar -czf $BACKUP_DIR/config_$DATE.tar.gz \
-    /home/mesh/mesh-ingestion-system/.env \
-    /home/mesh/config/ \
-    /etc/nginx/sites-available/mesh-ingestion \
-    /etc/systemd/system/mesh-ingestion.service
-
-echo "$(date): Configuration backup completed: config_$DATE.tar.gz"
-```
-
-### 3. Automated Backups
-Add to crontab:
-```bash
-# Daily database backup at 2 AM
-0 2 * * * /home/mesh/scripts/backup_db.sh >> /var/log/mesh/backup.log 2>&1
-
-# Weekly configuration backup on Sundays at 3 AM
-0 3 * * 0 /home/mesh/scripts/backup_config.sh >> /var/log/mesh/backup.log 2>&1
+# Configure Alertmanager
+kubectl apply -f monitoring/alertmanager/
 ```
 
 ## Troubleshooting
 
 ### Common Issues
 
-#### 1. Application Won't Start
+#### Database Connection Issues
+
 ```bash
-# Check service status
-sudo systemctl status mesh-ingestion
-
-# Check logs
-sudo journalctl -u mesh-ingestion -f
-
-# Check application logs
-tail -f /var/log/mesh/application.log
+# Check database connectivity
+kubectl exec -it deployment/mesh-api -n mesh-system -- python -c "
+from db.session import get_db_session
+import asyncio
+async def test():
+    async with get_db_session() as session:
+        result = await session.execute('SELECT 1')
+        print('Database connected:', result.scalar())
+asyncio.run(test())
+"
 ```
 
-#### 2. Database Connection Issues
+#### Redis Connection Issues
+
 ```bash
-# Test database connection
-psql -h localhost -U mesh_user -d mesh_production -c "SELECT 1;"
-
-# Check PostgreSQL status
-sudo systemctl status postgresql
-
-# Check PostgreSQL logs
-sudo tail -f /var/log/postgresql/postgresql-14-main.log
+# Test Redis connectivity
+kubectl exec -it deployment/mesh-api -n mesh-system -- python -c "
+import redis
+r = redis.from_url('redis://redis-service:6379')
+print('Redis ping:', r.ping())
+"
 ```
 
-#### 3. Redis Connection Issues
+#### AI Service Issues
+
 ```bash
-# Test Redis connection
-redis-cli -a your_redis_password_here ping
+# Check Ollama status
+curl http://ollama-service:11434/api/tags
 
-# Check Redis status
-sudo systemctl status redis-server
-
-# Check Redis logs
-sudo tail -f /var/log/redis/redis-server.log
-```
-
-#### 4. Gmail Webhook Issues
-```bash
-# Check webhook endpoint
-curl -X POST https://your-domain.com/webhooks/gmail \
-  -H "Content-Type: application/json" \
-  -d '{"test": true}'
-
-# Check Gmail push notification setup
-gcloud pubsub topics list
-gcloud pubsub subscriptions list
-```
-
-### Performance Tuning
-
-#### 1. Database Optimization
-```sql
--- Check slow queries
-SELECT query, mean_time, calls 
-FROM pg_stat_statements 
-ORDER BY mean_time DESC 
-LIMIT 10;
-
--- Analyze table statistics
-ANALYZE messages;
-ANALYZE entities;
-```
-
-#### 2. Redis Optimization
-```bash
-# Check Redis memory usage
-redis-cli -a your_redis_password_here info memory
-
-# Monitor Redis performance
-redis-cli -a your_redis_password_here --latency-history
-```
-
-#### 3. Application Tuning
-```bash
-# Monitor application performance
-htop
-
-# Check application metrics
-curl http://localhost:8000/status
+# Test ChromaDB
+curl http://chromadb-service:8000/api/v1/heartbeat
 ```
 
 ### Log Analysis
 
-#### 1. Application Logs
 ```bash
-# Search for errors
-grep -i error /var/log/mesh/application.log
+# View application logs
+kubectl logs -f deployment/mesh-api -n mesh-system
 
-# Monitor real-time logs
-tail -f /var/log/mesh/application.log | grep -i "gmail\|webhook\|error"
+# View all pod logs
+kubectl logs -f -l app.kubernetes.io/name=mesh-system -n mesh-system
 
-# Analyze log patterns
-awk '/ERROR/ {print $1, $2, $NF}' /var/log/mesh/application.log | sort | uniq -c
+# Export logs for analysis
+kubectl logs deployment/mesh-api -n mesh-system --since=1h > api-logs.txt
 ```
 
-#### 2. System Logs
-```bash
-# Check system messages
-sudo journalctl -f
+### Performance Tuning
 
-# Check specific service logs
-sudo journalctl -u mesh-ingestion -n 100
+#### Database Optimization
+
+```sql
+-- Analyze query performance
+EXPLAIN ANALYZE SELECT * FROM messages WHERE created_at > NOW() - INTERVAL '1 day';
+
+-- Check index usage
+SELECT schemaname, tablename, attname, n_distinct, correlation 
+FROM pg_stats 
+WHERE tablename = 'messages';
+```
+
+#### Resource Scaling
+
+```bash
+# Scale API pods
+kubectl scale deployment mesh-api --replicas=5 -n mesh-system
+
+# Update resource limits
+kubectl patch deployment mesh-api -n mesh-system -p '
+{
+  "spec": {
+    "template": {
+      "spec": {
+        "containers": [{
+          "name": "api",
+          "resources": {
+            "limits": {"memory": "2Gi", "cpu": "1"},
+            "requests": {"memory": "1Gi", "cpu": "500m"}
+          }
+        }]
+      }
+    }
+  }
+}'
+```
+
+### Health Checks
+
+```bash
+# System health overview
+curl -s http://mesh.yourdomain.com/api/v1/health | jq
+
+# Component health checks
+kubectl get pods -n mesh-system
+kubectl describe pod <pod-name> -n mesh-system
+
+# Service endpoints
+kubectl get endpoints -n mesh-system
+```
+
+### Backup and Recovery
+
+#### Database Backup
+
+```bash
+# Create backup
+kubectl exec postgres-0 -n mesh-system -- pg_dump -U mesh_user mesh_production > backup.sql
+
+# Restore backup
+kubectl exec -i postgres-0 -n mesh-system -- psql -U mesh_user mesh_production < backup.sql
+```
+
+#### Configuration Backup
+
+```bash
+# Backup Kubernetes resources
+kubectl get all,configmap,secret,pvc -n mesh-system -o yaml > mesh-system-backup.yaml
+
+# Backup Helm values
+helm get values mesh-system -n mesh-system > helm-values-backup.yaml
 ```
 
 ## Security Considerations
 
-### 1. File Permissions
-```bash
-# Secure configuration files
-chmod 600 /home/mesh/mesh-ingestion-system/.env
-chmod 600 /home/mesh/config/gmail_credentials.json
-chmod 600 /home/mesh/config/gmail_token.json
-```
+### Network Security
 
-### 2. Network Security
-- Use firewall to restrict access
-- Enable SSL/TLS for all external communications
-- Regularly update SSL certificates
-- Monitor for suspicious webhook requests
+- Use network policies to restrict pod-to-pod communication
+- Enable TLS for all external communications
+- Use service mesh for internal encryption (optional)
 
-### 3. Credential Management
-- Rotate API keys and secrets regularly
-- Use environment variables for sensitive data
-- Enable audit logging for credential access
-- Implement proper backup encryption
+### Secret Management
 
----
+- Use Kubernetes secrets or external secret managers
+- Rotate secrets regularly
+- Never commit secrets to version control
 
-**Last Updated**: January 15, 2025  
-**Version**: 1.0.0
+### Access Control
 
-For additional support, see `/docs/troubleshooting/` or contact the development team.
+- Implement RBAC for Kubernetes access
+- Use service accounts with minimal permissions
+- Enable audit logging
+
+### Compliance
+
+- Regular security scans
+- Vulnerability assessments
+- Compliance reporting (SOC 2, GDPR, etc.)
+
+## Support and Maintenance
+
+### Regular Maintenance Tasks
+
+1. **Weekly:**
+   - Review system metrics and alerts
+   - Check log aggregation for errors
+   - Verify backup integrity
+
+2. **Monthly:**
+   - Update dependencies and security patches
+   - Review resource utilization and scaling
+   - Performance optimization review
+
+3. **Quarterly:**
+   - Security audit and penetration testing
+   - Disaster recovery testing
+   - Capacity planning review
+
+### Getting Help
+
+- Check the troubleshooting section
+- Review system logs and metrics
+- Contact support team with detailed error information
+- Use GitHub issues for bug reports and feature requests
+
+For additional support, please refer to the [operational runbooks](OPERATIONAL_RUNBOOKS.md) and [monitoring guide](MONITORING_GUIDE.md).

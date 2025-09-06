@@ -3,7 +3,8 @@
 from fastapi import APIRouter
 from api.routes import (
     health, stats, participants, threads, messages, search, contact_search,
-    whatsapp, security, contact_dossiers, summaries, files, websocket, monitoring, tenants, batch_processing
+    whatsapp, security, contact_dossiers, summaries, files, websocket, monitoring, tenants, batch_processing,
+    contact_insights, platform_connections
 )
 
 # Create main API router
@@ -26,6 +27,8 @@ api_router.include_router(websocket.router)
 api_router.include_router(monitoring.router)
 api_router.include_router(tenants.router)
 api_router.include_router(batch_processing.router)
+api_router.include_router(contact_insights.router)
+api_router.include_router(platform_connections.router)
 
 # Export for use in main application
 __all__ = ["api_router"]
