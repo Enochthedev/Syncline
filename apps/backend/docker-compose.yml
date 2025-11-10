@@ -1,0 +1,155 @@
+# =============================================================================
+# R.E.M.I Backend Rebuild - Docker Compose Configuration
+# =============================================================================
+# This configuration sets up all required services for local development:
+# - PostgreSQL: Primary database with UUID and JSONB support
+# - Redis: Event streaming and caching
+# - Ollama: Local LLM inference
+# - ChromaDB: Vector database for embeddings
+# =============================================================================
+
+services:
+  # ===========================================================================
+  # PostgreSQL Database
+  # ===========================================================================
+  postgres:
+    image: postgres:14-alpine
+    container_name: remi_postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: mesh_development
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=en_US.UTF-8"
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./db/sql:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - remi_network
+
+  # ===========================================================================
+  # Redis (Event Bus & Caching)
+  # ===========================================================================
+  redis:
+    image: redis:6-alpine
+    container_name: remi_redis
+    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - remi_network
+
+  # ===========================================================================
+  # Ollama (Local LLM Inference)
+  # ===========================================================================
+  ollama:
+    image: ollama/ollama:latest
+    container_name: remi_ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    environment:
+      - OLLAMA_HOST=0.0.0.0
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - remi_network
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+
+  # ===========================================================================
+  # ChromaDB (Vector Database)
+  # ===========================================================================
+  chromadb:
+    image: chromadb/chroma:latest
+    container_name: remi_chromadb
+    ports:
+      - "8001:8000"
+    volumes:
+      - chromadb_data:/chroma/chroma
+    environment:
+      - IS_PERSISTENT=TRUE
+      - PERSIST_DIRECTORY=/chroma/chroma
+      - ANONYMIZED_TELEMETRY=FALSE
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/heartbeat"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - remi_network
+
+  # ===========================================================================
+  # Backend API (Optional - for full stack development)
+  # ===========================================================================
+  # Uncomment to run the backend API in Docker
+  # api:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile
+  #   container_name: remi_api
+  #   command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+  #   ports:
+  #     - "8000:8000"
+  #   volumes:
+  #     - .:/app
+  #     - /app/.venv
+  #   environment:
+  #     - DATABASE_URL=postgresql+asyncpg://postgres:password@postgres:5432/mesh_development
+  #     - REDIS_URL=redis://redis:6379
+  #     - OLLAMA_BASE_URL=http://ollama:11434
+  #     - CHROMA_HOST=chromadb
+  #     - CHROMA_PORT=8000
+  #     - ENV=development
+  #     - DEBUG=true
+  #   depends_on:
+  #     postgres:
+  #       condition: service_healthy
+  #     redis:
+  #       condition: service_healthy
+  #     ollama:
+  #       condition: service_healthy
+  #     chromadb:
+  #       condition: service_healthy
+  #   networks:
+  #     - remi_network
+
+# =============================================================================
+# Networks
+# =============================================================================
+networks:
+  remi_network:
+    driver: bridge
+
+# =============================================================================
+# Volumes (Persistent Data)
+# =============================================================================
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  ollama_data:
+    driver: local
+  chromadb_data:
+    driver: local
