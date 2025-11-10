@@ -27,7 +27,7 @@ This repository contains the Progressive Web Application for R.E.M.I (Real-time 
 ## Project Structure
 
 ```
-remi-web/
+apps/web/
 ├── src/
 │   ├── components/             # Reusable React components
 │   │   ├── common/            # Common UI components

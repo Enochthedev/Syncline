@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Reorganized repository layout into `apps/`, `ops/`, `archives/`, and `var/` for clearer platform boundaries and to isolate runtime artifacts.
+
 ### Planned
 - Slack connector implementation
 - Discord connector implementation

@@ -26,7 +26,7 @@ This repository contains the React Native mobile application for R.E.M.I (Real-t
 ## Project Structure
 
 ```
-remi-mobile/
+apps/mobile/
 ├── src/
 │   ├── components/             # Reusable React Native components
 │   │   ├── common/            # Common UI components

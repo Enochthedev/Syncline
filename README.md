@@ -12,6 +12,23 @@
 
 MESH (Multi-platform Event Stream Hub) is a real-time message ingestion and processing system that connects to multiple communication platforms, normalizes messages into a unified format, and provides powerful APIs for querying and analysis.
 
+## Repository Layout
+
+```
+apps/
+  backend/   # FastAPI + workers
+  web/       # Next.js application
+  mobile/    # Expo mobile client
+ops/
+  infra/     # Infrastructure-as-code and deployment assets
+  scripts/   # Operational automation and test runners
+  test_bridges/
+docs/        # Architecture and platform guides
+archives/    # Legacy snapshots kept for reference
+examples/    # SDK and usage demos
+var/         # Runtime artifacts (databases, generated data)
+```
+
 ### Key Features
 
 🚀 **Real-time Ingestion** - Process messages as they arrive with minimal latency  
@@ -41,6 +58,7 @@ MESH (Multi-platform Event Stream Hub) is a real-time message ingestion and proc
 
 2. **Set up virtual environment**
    ```bash
+   cd apps/backend
    python -m venv venv
    source venv/bin/activate  # On Windows: venv\Scripts\activate
    pip install -r requirements.txt
@@ -71,11 +89,11 @@ The API will be available at `http://localhost:8000`
 ### Docker Setup (Alternative)
 
 ```bash
-# Build and start services
-docker-compose up -d
+# Build and start services from repo root
+docker compose -f ops/infra/docker-compose.yml up -d
 
-# Run migrations
-docker-compose exec app alembic upgrade head
+# Run migrations inside the app container
+docker compose -f ops/infra/docker-compose.yml exec app alembic upgrade head
 ```
 
 ## Platform Support
@@ -257,16 +275,16 @@ See [Deployment Guide](docs/DEPLOYMENT_GUIDE.md) for detailed instructions.
 ### Docker Deployment
 ```bash
 # Production build
-docker build -t mesh-ingestion:latest .
+docker build -t mesh-ingestion:latest -f ops/infra/Dockerfile .
 
 # Run with docker-compose
-docker-compose -f docker-compose.prod.yml up -d
+docker compose -f ops/infra/docker-compose.prod.yml up -d
 ```
 
 ### Kubernetes Deployment
 ```bash
 # Apply Kubernetes manifests
-kubectl apply -f k8s/
+kubectl apply -f ops/infra/k8s/
 ```
 
 ## Documentation
