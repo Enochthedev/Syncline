@@ -19,3 +19,12 @@ token.json
 
 # Runtime artifacts
 var/
+
+# Archive directories (not tracked)
+apps/backend_archive/
+archives/
+ops/
+
+# Future app directories (add when ready to track)
+apps/mobile/
+apps/web/
