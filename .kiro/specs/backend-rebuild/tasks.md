@@ -41,15 +41,15 @@
   - Test migration up and down
   - _Requirements: 12.3_
 
-- [ ] 3. Set up event bus infrastructure
-- [ ] 3.1 Implement Redis client and event bus
+- [x] 3. Set up event bus infrastructure
+- [x] 3.1 Implement Redis client and event bus
   - Create db/redis_client.py with connection management
   - Implement services/event_bus.py with Redis Streams
   - Create event type definitions in services/events/types.py
   - Implement producer and consumer patterns
   - _Requirements: 7.3, 6.1_
 
-- [ ] 3.2 Create event handlers framework
+- [x] 3.2 Create event handlers framework
   - Implement base event handler class
   - Create event routing and dispatch logic
   - Add consumer group management
