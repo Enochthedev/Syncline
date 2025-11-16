@@ -63,10 +63,11 @@ class Message(Base):
     # Thread/conversation identifier
     thread_id = Column(String(255), nullable=True, index=True)
     
-    # Sender (will be linked to Participant model in task 2.3)
+    # Sender (linked to Participant model)
     sender_id = Column(
         UUID(as_uuid=True),
-        nullable=True,  # Nullable until Participant model is created
+        ForeignKey("participants.id", ondelete="SET NULL"),
+        nullable=True,
         index=True
     )
     
@@ -96,7 +97,11 @@ class Message(Base):
     # Relationships
     connection = relationship("PlatformConnection")
     raw_message = relationship("RawMessage", back_populates="message")
-    sender = relationship("Participant", foreign_keys=[sender_id])
+    sender = relationship(
+        "Participant",
+        foreign_keys=[sender_id],
+        back_populates="sent_messages"
+    )
     attachments = relationship(
         "Attachment",
         back_populates="message",

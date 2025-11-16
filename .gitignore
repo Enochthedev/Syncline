@@ -15,7 +15,7 @@ config/credentials.json
 token.json
 *.DS_Store
 
-.kiro/
+
 
 # Runtime artifacts
 var/

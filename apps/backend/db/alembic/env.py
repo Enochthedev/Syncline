@@ -25,6 +25,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from db.base import Base
 from config.config import settings
 
+# Import all models so Alembic can detect them
+import db.models  # noqa: F401
+
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config

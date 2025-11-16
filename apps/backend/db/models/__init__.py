@@ -16,6 +16,7 @@ from db.models.attachment import Attachment
 from db.models.entity import Entity
 from db.models.summary import Summary
 from db.models.embedding import Embedding
+from db.models.collection_job import CollectionJob, JobType, JobStatus
 
 __all__ = [
     "User",
@@ -31,4 +32,7 @@ __all__ = [
     "Entity",
     "Summary",
     "Embedding",
+    "CollectionJob",
+    "JobType",
+    "JobStatus",
 ]
