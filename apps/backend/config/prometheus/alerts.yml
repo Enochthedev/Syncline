@@ -1,0 +1,181 @@
+groups:
+  - name: remi_backend_alerts
+    interval: 30s
+    rules:
+      # HTTP Alerts
+      - alert: HighErrorRate
+        expr: rate(http_requests_total{status=~"5.."}[5m]) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+          component: api
+        annotations:
+          summary: "High HTTP error rate detected"
+          description: "Error rate is {{ $value | humanizePercentage }} for endpoint {{ $labels.endpoint }}"
+
+      - alert: SlowHTTPRequests
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 5
+        for: 10m
+        labels:
+          severity: warning
+          component: api
+        annotations:
+          summary: "Slow HTTP requests detected"
+          description: "95th percentile request duration is {{ $value }}s for {{ $labels.endpoint }}"
+
+      # Message Processing Alerts
+      - alert: MessageProcessingFailed
+        expr: rate(messages_failed_total[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: critical
+          component: processing
+        annotations:
+          summary: "High message processing failure rate"
+          description: "{{ $value }} messages/sec failing at {{ $labels.stage }} stage for {{ $labels.platform }}"
+
+      - alert: MessageQueueBacklog
+        expr: messages_in_queue > 1000
+        for: 15m
+        labels:
+          severity: warning
+          component: processing
+        annotations:
+          summary: "Large message queue backlog"
+          description: "{{ $value }} messages in {{ $labels.stage }} queue"
+
+      # Collection Job Alerts
+      - alert: CollectionJobStuck
+        expr: collection_jobs_active > 0 unless changes(collection_jobs_active[30m]) > 0
+        for: 30m
+        labels:
+          severity: warning
+          component: collection
+        annotations:
+          summary: "Collection job appears stuck"
+          description: "{{ $value }} jobs active for {{ $labels.platform }} with no progress"
+
+      - alert: HighCollectionJobFailureRate
+        expr: rate(collection_jobs_total{status="failed"}[10m]) > 0.1
+        for: 10m
+        labels:
+          severity: critical
+          component: collection
+        annotations:
+          summary: "High collection job failure rate"
+          description: "{{ $value }} jobs/sec failing for {{ $labels.platform }}"
+
+      # AI Processing Alerts
+      - alert: AIProcessingErrors
+        expr: rate(ai_processing_errors_total[5m]) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+          component: ai
+        annotations:
+          summary: "High AI processing error rate"
+          description: "{{ $value }} errors/sec for {{ $labels.operation }}"
+
+      - alert: SlowAIProcessing
+        expr: histogram_quantile(0.95, rate(ai_processing_duration_seconds_bucket[5m])) > 30
+        for: 10m
+        labels:
+          severity: warning
+          component: ai
+        annotations:
+          summary: "Slow AI processing detected"
+          description: "95th percentile AI processing time is {{ $value }}s for {{ $labels.operation }}"
+
+      # Database Alerts
+      - alert: HighDatabaseErrorRate
+        expr: rate(db_errors_total[5m]) > 0.01
+        for: 5m
+        labels:
+          severity: critical
+          component: database
+        annotations:
+          summary: "High database error rate"
+          description: "{{ $value }} database errors/sec for {{ $labels.operation }}"
+
+      - alert: SlowDatabaseQueries
+        expr: histogram_quantile(0.95, rate(db_query_duration_seconds_bucket[5m])) > 2
+        for: 10m
+        labels:
+          severity: warning
+          component: database
+        annotations:
+          summary: "Slow database queries detected"
+          description: "95th percentile query time is {{ $value }}s for {{ $labels.operation }}"
+
+      - alert: DatabaseConnectionPoolExhausted
+        expr: db_connections_active > 45
+        for: 5m
+        labels:
+          severity: critical
+          component: database
+        annotations:
+          summary: "Database connection pool near exhaustion"
+          description: "{{ $value }} active connections (limit is 50)"
+
+      # Platform Connection Alerts
+      - alert: PlatformConnectionDown
+        expr: platform_connections_total{status="active"} == 0
+        for: 15m
+        labels:
+          severity: critical
+          component: integration
+        annotations:
+          summary: "No active platform connections"
+          description: "No active connections for {{ $labels.platform }}"
+
+      - alert: HighPlatformConnectionErrors
+        expr: rate(platform_connection_errors_total[5m]) > 0.05
+        for: 10m
+        labels:
+          severity: warning
+          component: integration
+        annotations:
+          summary: "High platform connection error rate"
+          description: "{{ $value }} errors/sec for {{ $labels.platform }}: {{ $labels.error_type }}"
+
+      # WebSocket Alerts
+      - alert: WebSocketConnectionsHigh
+        expr: websocket_connections_active > 1000
+        for: 10m
+        labels:
+          severity: warning
+          component: websocket
+        annotations:
+          summary: "High number of WebSocket connections"
+          description: "{{ $value }} active WebSocket connections"
+
+      # Application Health
+      - alert: ServiceDown
+        expr: up{job="remi-backend"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          component: system
+        annotations:
+          summary: "Service is down"
+          description: "R.E.M.I backend service is not responding"
+
+      - alert: HighMemoryUsage
+        expr: process_resident_memory_bytes > 2e9
+        for: 10m
+        labels:
+          severity: warning
+          component: system
+        annotations:
+          summary: "High memory usage"
+          description: "Memory usage is {{ $value | humanize }}B"
+
+      - alert: HighCPUUsage
+        expr: rate(process_cpu_seconds_total[5m]) > 0.8
+        for: 10m
+        labels:
+          severity: warning
+          component: system
+        annotations:
+          summary: "High CPU usage"
+          description: "CPU usage is {{ $value | humanizePercentage }}"
