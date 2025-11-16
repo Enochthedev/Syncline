@@ -5,6 +5,7 @@ Represents system users who own platform connections and messages.
 """
 
 from sqlalchemy import Column, String, Boolean
+from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import relationship
 
 from db.base import Base
@@ -37,6 +38,10 @@ class User(Base):
     # User status
     is_active = Column(Boolean, default=True, nullable=False)
     is_superuser = Column(Boolean, default=False, nullable=False)
+
+    # Role-based access control
+    role = Column(String(50), default="user", nullable=False, index=True)
+    permissions = Column(ARRAY(String), default=list, nullable=True)
     
     # Relationships
     platform_connections = relationship(
