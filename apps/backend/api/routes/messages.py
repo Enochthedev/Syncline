@@ -24,6 +24,11 @@ from db.models.message import Message
 from db.models.raw_message import RawMessage
 from services.event_bus import get_event_bus
 from services.events.types import EventType, MessageEvent
+from services.search.fulltext_search import (
+    get_fulltext_search_service,
+    FullTextSearchFilter,
+    FullTextSearchResult as FullTextResult,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -107,15 +112,108 @@ class MessageStats(BaseModel):
 
 class ReprocessResponse(BaseModel):
     """Reprocess message response."""
-    
+
     message_id: UUID = Field(..., description="Message ID")
     status: str = Field(..., description="Reprocess status")
     message: str = Field(..., description="Status message")
 
 
+class FullTextSearchResponse(BaseModel):
+    """Full-text search response."""
+
+    query: str = Field(..., description="Search query")
+    results: list[FullTextResult] = Field(..., description="Search results")
+    total: int = Field(..., description="Total number of results")
+    skip: int = Field(..., description="Number of results skipped")
+    limit: int = Field(..., description="Maximum results returned")
+
+
 # =============================================================================
 # Message Endpoints
 # =============================================================================
+
+@router.get(
+    "/search",
+    response_model=FullTextSearchResponse,
+    summary="Full-Text Search Messages",
+    description="Search messages using PostgreSQL full-text search with advanced filtering"
+)
+async def search_messages(
+    query: str = Query(..., min_length=1, description="Search query"),
+    db: AsyncSession = Depends(get_database_session),
+    pagination: PaginationParams = Depends(get_pagination_params),
+    platforms: list[str] | None = Query(None, description="Filter by platforms"),
+    contact_ids: list[UUID] | None = Query(None, description="Filter by contact IDs"),
+    thread_ids: list[str] | None = Query(None, description="Filter by thread IDs"),
+    start_date: datetime | None = Query(None, description="Filter messages after this date"),
+    end_date: datetime | None = Query(None, description="Filter messages before this date"),
+    has_attachments: bool | None = Query(None, description="Filter by attachment presence"),
+    include_highlights: bool = Query(True, description="Include highlighted snippets"),
+) -> FullTextSearchResponse:
+    """
+    Search messages using full-text search.
+
+    Performs PostgreSQL full-text search with ranking and highlighting.
+    Supports advanced filtering by platform, contact, date range, and more.
+
+    Args:
+        query: Search query text
+        db: Database session
+        pagination: Pagination parameters
+        platforms: Optional platform filter
+        contact_ids: Optional contact ID filter
+        thread_ids: Optional thread ID filter
+        start_date: Optional start date filter
+        end_date: Optional end date filter
+        has_attachments: Optional attachment filter
+        include_highlights: Whether to include highlighted snippets
+
+    Returns:
+        FullTextSearchResponse: Search results with ranking
+    """
+    try:
+        logger.info(f"Full-text search: '{query}'")
+
+        # Build search filters
+        search_filter = FullTextSearchFilter(
+            platforms=platforms,
+            contact_ids=contact_ids,
+            thread_ids=thread_ids,
+            start_date=start_date,
+            end_date=end_date,
+            has_attachments=has_attachments,
+        )
+
+        # Get search service
+        search_service = get_fulltext_search_service()
+
+        # Perform search
+        results, total = await search_service.search(
+            query=query,
+            db=db,
+            limit=pagination.limit,
+            offset=pagination.skip,
+            filters=search_filter,
+            include_highlights=include_highlights,
+        )
+
+        logger.info(f"Full-text search returned {len(results)} results (total: {total})")
+
+        return FullTextSearchResponse(
+            query=query,
+            results=results,
+            total=total,
+            skip=pagination.skip,
+            limit=pagination.limit,
+        )
+
+    except Exception as e:
+        logger.error(f"Full-text search failed: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Search failed: {str(e)}"
+        )
+
 
 @router.get(
     "",
