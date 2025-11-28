@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { StyleSheet, View, Text, ScrollView, TouchableOpacity, Dimensions } from 'react-native';
+import React from 'react';
+import { StyleSheet, View, Text, ScrollView, TouchableOpacity, Dimensions, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -16,7 +16,7 @@ const SUMMARIES = [
         title: 'Team Meeting Notes',
         platform: 'Slack',
         gradient: ['#4A154B', '#611f69'],
-        icon: '💬',
+        icon: 'logo-slack',
         messageCount: 24,
         summary: 'Q4 roadmap discussion with Sarah and the team. Budget allocation approved, timeline adjustments needed for new features.',
         timestamp: '2h ago',
@@ -28,7 +28,7 @@ const SUMMARIES = [
         title: 'Client Approval',
         platform: 'Gmail',
         gradient: ['#EA4335', '#C5221F'],
-        icon: '📧',
+        icon: 'mail',
         messageCount: 12,
         summary: 'Mockups approved! Development starts Monday. Design team delivering final assets by end of week.',
         timestamp: '5h ago',
@@ -40,7 +40,7 @@ const SUMMARIES = [
         title: 'Budget Review',
         platform: 'Discord',
         gradient: ['#5865F2', '#404EBC'],
-        icon: '💰',
+        icon: 'logo-discord',
         messageCount: 18,
         summary: 'Monthly expenses reviewed. Server costs up 15%. Planning optimization sprint for next week.',
         timestamp: '1d ago',
@@ -57,38 +57,54 @@ export default function HomeScreen() {
             {/* Gradient Background Header */}
             <LinearGradient
                 colors={[theme.colors.primary, theme.colors.primaryDark]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
                 style={styles.gradientHeader}
             >
-                <View style={styles.header}>
-                    <View>
-                        <Text style={styles.greeting}>Good Morning 👋</Text>
-                        <Text style={styles.headerSubtitle}>Here's what happened today</Text>
+                <View style={styles.headerContent}>
+                    <View style={styles.headerTop}>
+                        <View>
+                            <Text style={styles.greeting}>Welcome back</Text>
+                            <Text style={styles.headerSubtitle}>Your daily briefing is ready</Text>
+                        </View>
+                        <TouchableOpacity style={styles.avatarButton}>
+                            <View style={styles.avatar}>
+                                <Text style={styles.avatarText}>U</Text>
+                            </View>
+                        </TouchableOpacity>
                     </View>
-                    <TouchableOpacity style={styles.avatarButton}>
-                        <LinearGradient
-                            colors={['rgba(255,255,255,0.3)', 'rgba(255,255,255,0.1)']}
-                            style={styles.avatar}
-                        >
-                            <Text style={styles.avatarText}>U</Text>
-                        </LinearGradient>
-                    </TouchableOpacity>
-                </View>
 
-                {/* Quick Stats - Inside gradient */}
-                <View style={styles.statsRow}>
-                    <View style={styles.statItem}>
-                        <Text style={styles.statValue}>24</Text>
-                        <Text style={styles.statLabel}>Unread</Text>
-                    </View>
-                    <View style={styles.statDivider} />
-                    <View style={styles.statItem}>
-                        <Text style={styles.statValue}>12</Text>
-                        <Text style={styles.statLabel}>Threads</Text>
-                    </View>
-                    <View style={styles.statDivider} />
-                    <View style={styles.statItem}>
-                        <Text style={styles.statValue}>54</Text>
-                        <Text style={styles.statLabel}>Today</Text>
+                    {/* Stats Dashboard */}
+                    <View style={styles.statsContainer}>
+                        <View style={styles.statItem}>
+                            <View style={[styles.statIconContainer, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
+                                <Ionicons name="mail-unread-outline" size={20} color="white" />
+                            </View>
+                            <View>
+                                <Text style={styles.statValue}>24</Text>
+                                <Text style={styles.statLabel}>Unread</Text>
+                            </View>
+                        </View>
+                        <View style={styles.statDivider} />
+                        <View style={styles.statItem}>
+                            <View style={[styles.statIconContainer, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
+                                <Ionicons name="chatbubbles-outline" size={20} color="white" />
+                            </View>
+                            <View>
+                                <Text style={styles.statValue}>12</Text>
+                                <Text style={styles.statLabel}>Threads</Text>
+                            </View>
+                        </View>
+                        <View style={styles.statDivider} />
+                        <View style={styles.statItem}>
+                            <View style={[styles.statIconContainer, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
+                                <Ionicons name="time-outline" size={20} color="white" />
+                            </View>
+                            <View>
+                                <Text style={styles.statValue}>54</Text>
+                                <Text style={styles.statLabel}>Today</Text>
+                            </View>
+                        </View>
                     </View>
                 </View>
             </LinearGradient>
@@ -98,99 +114,97 @@ export default function HomeScreen() {
                 showsVerticalScrollIndicator={false}
                 contentContainerStyle={styles.scrollContainer}
             >
+                {/* Quick Actions */}
+                <View style={styles.actionsSection}>
+                    <TouchableOpacity
+                        style={styles.actionButton}
+                        onPress={() => router.push('/connections')}
+                        activeOpacity={0.8}
+                    >
+                        <LinearGradient
+                            colors={[theme.colors.primary, theme.colors.primaryLight]}
+                            style={styles.actionGradient}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 1 }}
+                        >
+                            <Ionicons name="link" size={24} color="white" />
+                            <Text style={styles.actionText}>Connect Apps</Text>
+                        </LinearGradient>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                        style={styles.actionButton}
+                        onPress={() => router.push('/search')}
+                        activeOpacity={0.8}
+                    >
+                        <LinearGradient
+                            colors={[theme.colors.secondary, theme.colors.secondaryLight]}
+                            style={styles.actionGradient}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 1 }}
+                        >
+                            <Ionicons name="search" size={24} color="white" />
+                            <Text style={styles.actionText}>AI Search</Text>
+                        </LinearGradient>
+                    </TouchableOpacity>
+                </View>
+
                 {/* AI Summaries Section */}
                 <View style={styles.section}>
                     <View style={styles.sectionHeader}>
-                        <View>
-                            <Text style={styles.sectionTitle}>AI Summaries</Text>
-                            <Text style={styles.sectionSubtitle}>Powered by your messages</Text>
-                        </View>
+                        <Text style={styles.sectionTitle}>AI Summaries</Text>
                         <TouchableOpacity>
-                            <Ionicons name="add-circle" size={28} color={theme.colors.primary} />
+                            <Ionicons name="options-outline" size={24} color={theme.colors.textSecondary} />
                         </TouchableOpacity>
                     </View>
 
-                    {SUMMARIES.map((item, index) => (
+                    {SUMMARIES.map((item) => (
                         <TouchableOpacity key={item.id} activeOpacity={0.9} style={{ marginBottom: 16 }}>
-                            <Card padding="none" shadow="md">
-                                <LinearGradient
-                                    colors={item.gradient}
-                                    start={{ x: 0, y: 0 }}
-                                    end={{ x: 1, y: 0 }}
-                                    style={styles.summaryGradientBorder}
-                                >
-                                    <View style={styles.summaryInner}>
-                                        <View style={styles.summaryHeader}>
-                                            <View style={styles.summaryIconContainer}>
-                                                <Text style={styles.summaryIcon}>{item.icon}</Text>
-                                            </View>
-                                            <View style={styles.summaryTitleContainer}>
-                                                <Text style={styles.summaryTitle}>{item.title}</Text>
-                                                <View style={styles.summaryMeta}>
-                                                    <Badge variant="secondary" size="sm">{item.platform}</Badge>
-                                                    {item.unread > 0 && (
-                                                        <View style={styles.unreadBadge}>
-                                                            <Text style={styles.unreadText}>{item.unread}</Text>
-                                                        </View>
-                                                    )}
-                                                </View>
-                                            </View>
+                            <Card padding="none" shadow="sm" style={styles.summaryCard}>
+                                <View style={styles.summaryInner}>
+                                    <View style={styles.summaryHeader}>
+                                        <View style={[styles.platformIcon, { backgroundColor: item.gradient[0] }]}>
+                                            <Ionicons name={item.icon as any} size={20} color="white" />
                                         </View>
-
-                                        <Text style={styles.summaryContent} numberOfLines={2}>
-                                            {item.summary}
-                                        </Text>
-
-                                        <View style={styles.summaryFooter}>
-                                            <View style={styles.footerLeft}>
-                                                <Ionicons name="people-outline" size={14} color={theme.colors.textTertiary} />
-                                                <Text style={styles.footerText}>{item.participants} people</Text>
-                                                <Text style={styles.footerDot}>•</Text>
-                                                <Ionicons name="chatbubble-outline" size={14} color={theme.colors.textTertiary} />
-                                                <Text style={styles.footerText}>{item.messageCount}</Text>
+                                        <View style={styles.summaryTitleContainer}>
+                                            <View style={styles.titleRow}>
+                                                <Text style={styles.summaryTitle}>{item.title}</Text>
+                                                <Text style={styles.timestamp}>{item.timestamp}</Text>
                                             </View>
-                                            <Text style={styles.timestamp}>{item.timestamp}</Text>
+                                            <View style={styles.summaryMeta}>
+                                                <Text style={styles.platformName}>{item.platform}</Text>
+                                                {item.unread > 0 && (
+                                                    <View style={styles.unreadBadge}>
+                                                        <Text style={styles.unreadText}>{item.unread} new</Text>
+                                                    </View>
+                                                )}
+                                            </View>
                                         </View>
                                     </View>
-                                </LinearGradient>
+
+                                    <Text style={styles.summaryContent} numberOfLines={2}>
+                                        {item.summary}
+                                    </Text>
+
+                                    <View style={styles.summaryFooter}>
+                                        <View style={styles.footerItem}>
+                                            <Ionicons name="people-outline" size={14} color={theme.colors.textTertiary} />
+                                            <Text style={styles.footerText}>{item.participants}</Text>
+                                        </View>
+                                        <View style={styles.footerItem}>
+                                            <Ionicons name="chatbubble-outline" size={14} color={theme.colors.textTertiary} />
+                                            <Text style={styles.footerText}>{item.messageCount}</Text>
+                                        </View>
+                                        <View style={{ flex: 1 }} />
+                                        <TouchableOpacity style={styles.readMoreButton}>
+                                            <Text style={styles.readMoreText}>Read Summary</Text>
+                                            <Ionicons name="arrow-forward" size={14} color={theme.colors.primary} />
+                                        </TouchableOpacity>
+                                    </View>
+                                </View>
                             </Card>
                         </TouchableOpacity>
                     ))}
-                </View>
-
-                {/* Quick Actions */}
-                <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Quick Actions</Text>
-
-                    <View style={styles.actionsGrid}>
-                        <TouchableOpacity
-                            style={styles.actionCard}
-                            onPress={() => router.push('/connections')}
-                            activeOpacity={0.8}
-                        >
-                            <LinearGradient
-                                colors={[theme.colors.primary, theme.colors.primaryLight]}
-                                style={styles.actionGradient}
-                            >
-                                <Ionicons name="link-outline" size={32} color="white" />
-                                <Text style={styles.actionText}>Connect Apps</Text>
-                            </LinearGradient>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity
-                            style={styles.actionCard}
-                            onPress={() => router.push('/search')}
-                            activeOpacity={0.8}
-                        >
-                            <LinearGradient
-                                colors={[theme.colors.secondary, theme.colors.secondaryLight]}
-                                style={styles.actionGradient}
-                            >
-                                <Ionicons name="search-outline" size={32} color="white" />
-                                <Text style={styles.actionText}>AI Search</Text>
-                            </LinearGradient>
-                        </TouchableOpacity>
-                    </View>
                 </View>
 
                 <View style={{ height: 100 }} />
@@ -205,16 +219,18 @@ const styles = StyleSheet.create({
         backgroundColor: theme.colors.backgroundSecondary,
     },
     gradientHeader: {
-        paddingTop: 60,
-        paddingBottom: 24,
+        paddingTop: Platform.OS === 'ios' ? 60 : 40,
+        paddingBottom: 30,
         borderBottomLeftRadius: 32,
         borderBottomRightRadius: 32,
     },
-    header: {
+    headerContent: {
+        paddingHorizontal: 24,
+    },
+    headerTop: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        paddingHorizontal: 24,
         marginBottom: 24,
     },
     greeting: {
@@ -225,50 +241,64 @@ const styles = StyleSheet.create({
     },
     headerSubtitle: {
         fontSize: 14,
-        color: 'rgba(255, 255, 255, 0.8)',
+        color: 'rgba(255, 255, 255, 0.9)',
     },
     avatarButton: {
-        width: 48,
-        height: 48,
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: 'rgba(255, 255, 255, 0.2)',
+        padding: 2,
     },
     avatar: {
-        width: 48,
-        height: 48,
-        borderRadius: 24,
+        flex: 1,
+        backgroundColor: 'rgba(255, 255, 255, 0.9)',
+        borderRadius: 20,
         alignItems: 'center',
         justifyContent: 'center',
-        borderWidth: 2,
-        borderColor: 'rgba(255, 255, 255, 0.3)',
     },
     avatarText: {
-        color: 'white',
-        fontSize: 20,
+        color: theme.colors.primary,
+        fontSize: 18,
         fontWeight: 'bold',
     },
-    statsRow: {
+    statsContainer: {
         flexDirection: 'row',
-        justifyContent: 'space-around',
-        paddingHorizontal: 24,
-        paddingVertical: 20,
-        backgroundColor: 'rgba(255, 255, 255, 0.1)',
-        marginHorizontal: 24,
-        borderRadius: 16,
+        backgroundColor: 'rgba(255, 255, 255, 0.15)',
+        borderRadius: 20,
+        padding: 16,
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.1)',
     },
     statItem: {
+        flexDirection: 'row',
         alignItems: 'center',
+        gap: 12,
+        flex: 1,
+        justifyContent: 'center',
+    },
+    statIconContainer: {
+        width: 36,
+        height: 36,
+        borderRadius: 12,
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     statValue: {
-        fontSize: 32,
+        fontSize: 20,
         fontWeight: 'bold',
         color: 'white',
-        marginBottom: 4,
+        lineHeight: 24,
     },
     statLabel: {
-        fontSize: 12,
+        fontSize: 11,
         color: 'rgba(255, 255, 255, 0.8)',
     },
     statDivider: {
         width: 1,
+        height: 32,
         backgroundColor: 'rgba(255, 255, 255, 0.2)',
     },
     scrollContent: {
@@ -276,10 +306,34 @@ const styles = StyleSheet.create({
     },
     scrollContainer: {
         paddingTop: 24,
+        paddingBottom: 40,
+    },
+    actionsSection: {
+        flexDirection: 'row',
+        paddingHorizontal: 24,
+        gap: 16,
+        marginBottom: 32,
+    },
+    actionButton: {
+        flex: 1,
+        borderRadius: 20,
+        ...theme.shadows.sm,
+    },
+    actionGradient: {
+        padding: 20,
+        borderRadius: 20,
+        alignItems: 'center',
+        flexDirection: 'row',
+        gap: 12,
+        justifyContent: 'center',
+    },
+    actionText: {
+        color: 'white',
+        fontSize: 16,
+        fontWeight: '600',
     },
     section: {
         paddingHorizontal: 24,
-        marginBottom: 32,
     },
     sectionHeader: {
         flexDirection: 'row',
@@ -288,115 +342,103 @@ const styles = StyleSheet.create({
         marginBottom: 16,
     },
     sectionTitle: {
-        fontSize: 24,
+        fontSize: 20,
         fontWeight: 'bold',
         color: theme.colors.text,
-        marginBottom: 2,
     },
-    sectionSubtitle: {
-        fontSize: 14,
-        color: theme.colors.textSecondary,
-    },
-    summaryGradientBorder: {
-        padding: 3,
-        borderRadius: 16,
+    summaryCard: {
+        borderRadius: 20,
+        backgroundColor: 'white',
+        borderWidth: 1,
+        borderColor: theme.colors.borderLight,
     },
     summaryInner: {
-        backgroundColor: 'white',
-        borderRadius: 13,
-        padding: 16,
+        padding: 20,
     },
     summaryHeader: {
         flexDirection: 'row',
-        marginBottom: 12,
+        marginBottom: 16,
     },
-    summaryIconContainer: {
-        width: 40,
-        height: 40,
-        borderRadius: 12,
-        backgroundColor: theme.colors.surface,
+    platformIcon: {
+        width: 48,
+        height: 48,
+        borderRadius: 16,
         alignItems: 'center',
         justifyContent: 'center',
-        marginRight: 12,
-    },
-    summaryIcon: {
-        fontSize: 20,
+        marginRight: 16,
     },
     summaryTitleContainer: {
         flex: 1,
+        justifyContent: 'center',
+    },
+    titleRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 4,
     },
     summaryTitle: {
-        fontSize: 18,
+        fontSize: 16,
         fontWeight: '700',
         color: theme.colors.text,
-        marginBottom: 6,
     },
     summaryMeta: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: 8,
     },
+    platformName: {
+        fontSize: 13,
+        color: theme.colors.textSecondary,
+        fontWeight: '500',
+    },
     unreadBadge: {
-        backgroundColor: theme.colors.error,
-        borderRadius: 10,
+        backgroundColor: theme.colors.errorLight,
         paddingHorizontal: 8,
         paddingVertical: 2,
-        minWidth: 24,
-        alignItems: 'center',
+        borderRadius: 8,
     },
     unreadText: {
-        color: 'white',
+        color: theme.colors.error,
         fontSize: 11,
-        fontWeight: '700',
+        fontWeight: '600',
     },
     summaryContent: {
         fontSize: 15,
-        lineHeight: 22,
+        lineHeight: 24,
         color: theme.colors.textSecondary,
-        marginBottom: 12,
+        marginBottom: 16,
     },
     summaryFooter: {
         flexDirection: 'row',
-        justifyContent: 'space-between',
         alignItems: 'center',
+        paddingTop: 16,
+        borderTopWidth: 1,
+        borderTopColor: theme.colors.borderLight,
     },
-    footerLeft: {
+    footerItem: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: 6,
+        marginRight: 16,
     },
     footerText: {
         fontSize: 13,
         color: theme.colors.textTertiary,
-    },
-    footerDot: {
-        fontSize: 13,
-        color: theme.colors.textTertiary,
-    },
-    timestamp: {
-        fontSize: 13,
-        color: theme.colors.textTertiary,
         fontWeight: '500',
     },
-    actionsGrid: {
+    timestamp: {
+        fontSize: 12,
+        color: theme.colors.textTertiary,
+    },
+    readMoreButton: {
         flexDirection: 'row',
-        gap: 16,
-    },
-    actionCard: {
-        flex: 1,
-        borderRadius: 16,
-        overflow: 'hidden',
-        ...theme.shadows.md,
-    },
-    actionGradient: {
-        paddingVertical: 32,
-        paddingHorizontal: 20,
         alignItems: 'center',
-        gap: 12,
+        gap: 4,
     },
-    actionText: {
-        color: 'white',
-        fontSize: 16,
-        fontWeight: '700',
+    readMoreText: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: theme.colors.primary,
     },
 });

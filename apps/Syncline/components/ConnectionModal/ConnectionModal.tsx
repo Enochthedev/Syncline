@@ -5,16 +5,34 @@ import {
     Text,
     StyleSheet,
     TouchableOpacity,
-    TextInput,
     ScrollView,
     Alert,
+    Linking,
 } from 'react-native';
+import { GmailIcon } from '../../components/GmailIcon/GmailIcon';
+import { AppleIcon } from '../../components/AppleIcon/AppleIcon';
+import { FacebookIcon } from '../../components/FacebookIcon/FacebookIcon';
+import { SlackIcon } from '../../components/SlackIcon/SlackIcon';
+import { DiscordIcon } from '../../components/DiscordIcon/DiscordIcon';
+import { TelegramIcon } from '../../components/TelegramIcon/TelegramIcon';
+import { TwitterIcon } from '../../components/TwitterIcon/TwitterIcon';
+import { WhatsAppIcon } from '../../components/WhatsAppIcon/WhatsAppIcon';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons, MaterialCommunityIcons, FontAwesome5 } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../../src/theme';
 import { Platform } from '../../src/types';
 import { Card } from '../Card/Card';
 import { Badge } from '../Badge/Badge';
+import { connectionsAPI } from '../../src/api/endpoints/connections';
+
+const IconMap: Record<Platform, React.FC<{ size?: number; color?: string }>> = {
+    gmail: GmailIcon,
+    slack: SlackIcon,
+    discord: DiscordIcon,
+    telegram: TelegramIcon,
+    twitter: TwitterIcon,
+    whatsapp: WhatsAppIcon,
+};
 
 const PLATFORM_CONFIG: Record<Platform, {
     icon: string;
@@ -54,9 +72,9 @@ const PLATFORM_CONFIG: Record<Platform, {
     twitter: {
         icon: 'twitter',
         iconFamily: 'FontAwesome5',
-        label: 'Twitter',
-        gradient: ['#1DA1F2', '#0C85D0'],
-        description: 'Connect your Twitter/X account',
+        label: 'X (Twitter)',
+        gradient: ['#000000', '#14171A'],
+        description: 'Connect your X (formerly Twitter) account',
     },
     whatsapp: {
         icon: 'whatsapp',
@@ -67,52 +85,66 @@ const PLATFORM_CONFIG: Record<Platform, {
     },
 };
 
-const IconComponent = ({
-    family,
-    name,
-    size,
-    color,
-}: {
-    family: 'MaterialCommunityIcons' | 'FontAwesome5' | 'Ionicons';
-    name: string;
-    size: number;
-    color: string;
-}) => {
-    switch (family) {
-        case 'MaterialCommunityIcons':
-            return <MaterialCommunityIcons name={name as any} size={size} color={color} />;
-        case 'FontAwesome5':
-            return <FontAwesome5 name={name as any} size={size} color={color} />;
-        case 'Ionicons':
-            return <Ionicons name={name as any} size={size} color={color} />;
-    }
-};
-
 interface ConnectionModalProps {
     visible: boolean;
     platform: Platform;
+    userId: string;
     onClose: () => void;
-    onConnect: (credentials?: any) => void;
+    onConnect: (connectionId: string) => void;
 }
 
 export const ConnectionModal: React.FC<ConnectionModalProps> = ({
     visible,
     platform,
+    userId,
     onClose,
     onConnect,
 }) => {
     const config = PLATFORM_CONFIG[platform];
     const [loading, setLoading] = useState(false);
 
-    const handleConnect = () => {
+    const handleConnect = async () => {
         setLoading(true);
-        // Simulate connection
-        setTimeout(() => {
-            setLoading(false);
-            onConnect();
+
+        try {
+            // Step 1: Initiate OAuth flow with backend
+            const response = await connectionsAPI.initiateConnection(
+                platform,
+                userId,
+                // Deep link for mobile app to return after OAuth
+                'syncline://oauth/callback'
+            );
+
+            // Step 2: Open OAuth URL in browser
+            const canOpen = await Linking.canOpenURL(response.authorization_url);
+            if (!canOpen) {
+                throw new Error('Cannot open authorization URL');
+            }
+
+            await Linking.openURL(response.authorization_url);
+
+            // User completes OAuth in browser/external app
+            // The callback will be handled by deep linking
+            // For now, close modal and show success
+            onConnect(response.connection_id);
             onClose();
-            Alert.alert('Success', `Connected to ${config.label}!`);
-        }, 1500);
+
+            Alert.alert(
+                'OAuth Started',
+                `Complete the ${config.label} authorization in your browser. The app will reconnect automatically.`,
+                [{ text: 'OK' }]
+            );
+
+        } catch (error: any) {
+            console.error('Connection error:', error);
+            Alert.alert(
+                'Connection Failed',
+                error.message || `Failed to connect to ${config.label}. Please try again.`,
+                [{ text: 'OK' }]
+            );
+        } finally {
+            setLoading(false);
+        }
     };
 
     return (
@@ -135,12 +167,10 @@ export const ConnectionModal: React.FC<ConnectionModalProps> = ({
                         </TouchableOpacity>
 
                         <View style={styles.iconWrapper}>
-                            <IconComponent
-                                family={config.iconFamily}
-                                name={config.icon}
-                                size={48}
-                                color="white"
-                            />
+                            {(() => {
+                                const IconComp = IconMap[platform];
+                                return <IconComp size={48} color="white" />;
+                            })()}
                         </View>
 
                         <Text style={styles.modalTitle}>{config.label}</Text>

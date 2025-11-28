@@ -4,11 +4,14 @@ import { PlatformCard } from '../../components/connections/PlatformCard';
 import { connectionsAPI } from '../../src/api/endpoints/connections';
 import { Platform, Connection } from '../../src/types';
 
+import { ConnectionModal } from '../../components/ConnectionModal/ConnectionModal';
+
 const PLATFORMS: Platform[] = ['gmail', 'slack', 'discord', 'telegram', 'twitter', 'whatsapp'];
 
 export default function ConnectionsScreen() {
     const [connections, setConnections] = useState<Connection[]>([]);
-    const [loading, setLoading] = useState(false);
+    const [modalVisible, setModalVisible] = useState(false);
+    const [selectedPlatform, setSelectedPlatform] = useState<Platform | null>(null);
 
     // TODO: Replace with actual user ID from auth context
     const USER_ID = 'test-user-123';
@@ -20,34 +23,36 @@ export default function ConnectionsScreen() {
     const loadConnections = async () => {
         try {
             const data = await connectionsAPI.listConnections(USER_ID);
-            setConnections(data);
+            // API returns { connections: [...], total: number }
+            // Cast string platform to Platform type
+            const formattedConnections = (data.connections || []).map(conn => ({
+                ...conn,
+                platform: conn.platform as Platform,
+                status: conn.status as Connection['status'] // Ensure status matches
+            }));
+            setConnections(formattedConnections);
         } catch (error) {
             console.error('Failed to load connections:', error);
+            // Set empty array on error to prevent crash
+            setConnections([]);
         }
     };
 
-    const handleConnect = async (platform: Platform) => {
-        try {
-            setLoading(true);
-            const response = await connectionsAPI.initiateConnection(platform, USER_ID);
+    const handleConnectPress = (platform: Platform) => {
+        setSelectedPlatform(platform);
+        setModalVisible(true);
+    };
 
-            if (response.authorization_url) {
-                // Open OAuth URL
-                await Linking.openURL(response.authorization_url);
-            } else {
-                Alert.alert('Success', 'Connection initiated!');
-                loadConnections();
-            }
-        } catch (error) {
-            Alert.alert('Error', 'Failed to initiate connection');
-        } finally {
-            setLoading(false);
-        }
+    const handleConnectionComplete = (connectionId: string) => {
+        console.log('Connected:', connectionId);
+        loadConnections();
+        setModalVisible(false);
+        setSelectedPlatform(null);
     };
 
     const handleDisconnect = async (connectionId: string) => {
         try {
-            await connectionsAPI.disconnectPlatform(connectionId);
+            await connectionsAPI.disconnect(connectionId);
             loadConnections();
         } catch (error) {
             Alert.alert('Error', 'Failed to disconnect');
@@ -65,12 +70,25 @@ export default function ConnectionsScreen() {
                             key={platform}
                             platform={platform}
                             connection={connection}
-                            onConnect={() => handleConnect(platform)}
+                            onConnect={() => handleConnectPress(platform)}
                             onDisconnect={() => connection && handleDisconnect(connection.id)}
                         />
                     );
                 })}
             </View>
+
+            {selectedPlatform && (
+                <ConnectionModal
+                    visible={modalVisible}
+                    platform={selectedPlatform}
+                    userId={USER_ID}
+                    onClose={() => {
+                        setModalVisible(false);
+                        setSelectedPlatform(null);
+                    }}
+                    onConnect={handleConnectionComplete}
+                />
+            )}
         </ScrollView>
     );
 }
