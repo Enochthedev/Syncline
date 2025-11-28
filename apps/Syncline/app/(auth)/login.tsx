@@ -4,6 +4,8 @@ import { useRouter, Link } from 'expo-router';
 import { theme } from '../../src/theme';
 import { Ionicons } from '@expo/vector-icons';
 import { GoogleIcon } from '../../components/GoogleIcon/GoogleIcon';
+import { AppleIcon } from '../../components/AppleIcon/AppleIcon';
+import { FacebookIcon } from '../../components/FacebookIcon/FacebookIcon';
 
 export default function LoginScreen() {
     const router = useRouter();
@@ -110,14 +112,14 @@ export default function LoginScreen() {
                         style={styles.socialButton}
                         onPress={() => handleSocialLogin('Apple')}
                     >
-                        <Ionicons name="logo-apple" size={24} color="#000000" />
+                        <AppleIcon size={24} />
                     </TouchableOpacity>
 
                     <TouchableOpacity
                         style={styles.socialButton}
                         onPress={() => handleSocialLogin('Facebook')}
                     >
-                        <Ionicons name="logo-facebook" size={24} color="#1877F2" />
+                        <FacebookIcon size={24} />
                     </TouchableOpacity>
                 </View>
 

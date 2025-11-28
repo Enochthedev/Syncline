@@ -9,6 +9,8 @@ __pycache__
 *.db
 .env
 venv/
+.venv/
+node_modules/
 .idea/
 // add credentials.jsoon in the config folder
 config/credentials.json

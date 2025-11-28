@@ -5,74 +5,51 @@ import { Platform, Connection } from '../../src/types';
 import { Card } from '../Card/Card';
 import { Badge } from '../Badge/Badge';
 import { theme } from '../../src/theme';
-import { MaterialCommunityIcons, FontAwesome5, Ionicons } from '@expo/vector-icons';
+import { GmailIcon } from '../GmailIcon/GmailIcon';
+import { SlackIcon } from '../SlackIcon/SlackIcon';
+import { DiscordIcon } from '../DiscordIcon/DiscordIcon';
+import { TelegramIcon } from '../TelegramIcon/TelegramIcon';
+import { TwitterIcon } from '../TwitterIcon/TwitterIcon';
+import { WhatsAppIcon } from '../WhatsAppIcon/WhatsAppIcon';
 
 const { width } = Dimensions.get('window');
 
 // Map platforms to proper icons and gradients
 const PLATFORM_CONFIG: Record<Platform, {
-    icon: string;
-    iconFamily: 'MaterialCommunityIcons' | 'FontAwesome5' | 'Ionicons';
+    icon: React.FC<{ size?: number }>;
     label: string;
     gradient: [string, string];
 }> = {
     gmail: {
-        icon: 'gmail',
-        iconFamily: 'MaterialCommunityIcons',
+        icon: GmailIcon,
         label: 'Gmail',
         gradient: ['#EA4335', '#C5221F']
     },
     slack: {
-        icon: 'slack',
-        iconFamily: 'FontAwesome5',
+        icon: SlackIcon,
         label: 'Slack',
         gradient: ['#4A154B', '#611f69']
     },
     discord: {
-        icon: 'discord',
-        iconFamily: 'MaterialCommunityIcons',
+        icon: DiscordIcon,
         label: 'Discord',
         gradient: ['#5865F2', '#404EBC']
     },
     telegram: {
-        icon: 'telegram',
-        iconFamily: 'FontAwesome5',
+        icon: TelegramIcon,
         label: 'Telegram',
         gradient: ['#0088CC', '#006699']
     },
     twitter: {
-        icon: 'twitter',
-        iconFamily: 'FontAwesome5',
-        label: 'Twitter',
-        gradient: ['#1DA1F2', '#0C85D0']
+        icon: TwitterIcon,
+        label: 'X (Twitter)',
+        gradient: ['#000000', '#14171A']
     },
     whatsapp: {
-        icon: 'whatsapp',
-        iconFamily: 'FontAwesome5',
+        icon: WhatsAppIcon,
         label: 'WhatsApp',
         gradient: ['#25D366', '#1DA851']
     },
-};
-
-const IconComponent = ({
-    family,
-    name,
-    size,
-    color
-}: {
-    family: 'MaterialCommunityIcons' | 'FontAwesome5' | 'Ionicons';
-    name: string;
-    size: number;
-    color: string;
-}) => {
-    switch (family) {
-        case 'MaterialCommunityIcons':
-            return <MaterialCommunityIcons name={name as any} size={size} color={color} />;
-        case 'FontAwesome5':
-            return <FontAwesome5 name={name as any} size={size} color={color} />;
-        case 'Ionicons':
-            return <Ionicons name={name as any} size={size} color={color} />;
-    }
 };
 
 interface PlatformCardProps {
@@ -90,6 +67,7 @@ export const PlatformCard: React.FC<PlatformCardProps> = ({
 }) => {
     const config = PLATFORM_CONFIG[platform];
     const isConnected = connection?.status === 'active';
+    const IconComp = config.icon;
 
     return (
         <Card padding="m" shadow="lg" style={styles.cardContainer}>
@@ -100,12 +78,7 @@ export const PlatformCard: React.FC<PlatformCardProps> = ({
                 style={styles.gradientHeader}
             >
                 <View style={styles.iconContainer}>
-                    <IconComponent
-                        family={config.iconFamily}
-                        name={config.icon}
-                        size={32}
-                        color="white"
-                    />
+                    <IconComp size={32} />
                 </View>
                 <View style={styles.headerContent}>
                     <Text style={styles.platformLabel}>{config.label}</Text>
