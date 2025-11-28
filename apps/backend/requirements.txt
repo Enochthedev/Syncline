@@ -57,7 +57,7 @@ onnxconverter-common==1.14.0
 onnxruntime==1.21.0
 onnxruntime-tools==1.7.0
 openai==1.63.0
-openai-whisper==20240930
+openai-whisper @ git+https://github.com/openai/whisper.git
 optimum==1.24.0
 packaging==24.2
 pandas==2.2.3
@@ -280,10 +280,10 @@ yarl==1.19.0
 
 # AI and ML dependencies
 anthropic==0.40.0
-spacy==3.8.4
+spacy==3.8.11
 presidio-analyzer==2.2.355
 presidio-anonymizer==2.2.355
-chromadb==0.5.23
+chromadb==0.6.3
 sentence-transformers==3.3.1
 
 # Slack integration dependencies
