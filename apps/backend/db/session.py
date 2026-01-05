@@ -127,7 +127,7 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
 
 async def init_db() -> None:
     """
-    Initialize database connection and verify connectivity.
+    Initialize database connection, run migrations, and verify connectivity.
     
     This should be called during application startup.
     """
@@ -139,9 +139,50 @@ async def init_db() -> None:
             await conn.run_sync(lambda _: None)
         
         logger.info("Database connection initialized successfully")
+        
+        # Run migrations automatically
+        await run_migrations()
+        
     except Exception as e:
         logger.error(f"Failed to initialize database: {e}")
         raise
+
+
+async def run_migrations() -> None:
+    """
+    Run database migrations using Alembic.
+    
+    This runs 'alembic upgrade head' programmatically.
+    """
+    import asyncio
+    from alembic import command
+    from alembic.config import Config
+    import os
+    
+    try:
+        # Get the directory containing this file
+        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        alembic_ini = os.path.join(base_dir, "alembic.ini")
+        
+        if not os.path.exists(alembic_ini):
+            logger.warning(f"alembic.ini not found at {alembic_ini}, skipping migrations")
+            return
+        
+        # Create Alembic config
+        alembic_cfg = Config(alembic_ini)
+        
+        # Run migrations in a thread to avoid blocking
+        loop = asyncio.get_event_loop()
+        await loop.run_in_executor(
+            None,
+            lambda: command.upgrade(alembic_cfg, "head")
+        )
+        
+        logger.info("Database migrations completed successfully")
+        
+    except Exception as e:
+        logger.warning(f"Migration check/run encountered an issue: {e}")
+        # Don't fail startup if migrations have issues - they might already be applied
 
 
 async def close_db() -> None:

@@ -4,13 +4,14 @@ API Routes Package
 Contains all API endpoint routers:
 - Health check endpoints
 - Connection management
-- Collection endpoints (TODO)
-- Message endpoints (TODO)
-- Contact endpoints (TODO)
-- Thread endpoints (TODO)
-- AI endpoints (TODO)
+- Collection endpoints
+- Message endpoints
+- Chat endpoints
+- Contact endpoints
+- Thread endpoints
+- AI endpoints
 """
 
-from . import health, connections
+from . import health, connections, chats, ai
 
-__all__ = ["health", "connections"]
+__all__ = ["health", "connections", "chats", "ai"]

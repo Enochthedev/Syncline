@@ -132,6 +132,44 @@ class SplitContactResponse(BaseModel):
 
 
 # =============================================================================
+# Inbox Models (Contacts with Last Message)
+# =============================================================================
+
+class LastMessageInfo(BaseModel):
+    """Last message preview info."""
+    
+    message_id: UUID | None = Field(None, description="Message ID")
+    content: str | None = Field(None, description="Message preview text")
+    platform: str | None = Field(None, description="Platform of last message")
+    timestamp: datetime | None = Field(None, description="Message timestamp")
+    sender_name: str | None = Field(None, description="Sender name")
+    is_from_me: bool = Field(default=False, description="Whether message is from current user")
+
+
+class InboxContact(BaseModel):
+    """Contact with last message info for inbox view."""
+    
+    id: UUID = Field(..., description="Contact ID")
+    canonical_name: str = Field(..., description="Contact name")
+    emails: list[str] | None = Field(None, description="Email addresses")
+    phones: list[str] | None = Field(None, description="Phone numbers")
+    platform_identities: dict[str, str] | None = Field(None, description="Platform-specific IDs")
+    avatar_url: str | None = Field(None, description="Avatar URL")
+    last_message: LastMessageInfo | None = Field(None, description="Last message info")
+    unread_count: int = Field(default=0, description="Unread message count")
+    platforms: list[str] = Field(default_factory=list, description="Connected platforms")
+
+
+class InboxResponse(BaseModel):
+    """Inbox response with contacts sorted by last message."""
+    
+    contacts: list[InboxContact] = Field(..., description="Contacts with last messages")
+    total: int = Field(..., description="Total contacts with messages")
+    skip: int = Field(..., description="Offset")
+    limit: int = Field(..., description="Limit")
+
+
+# =============================================================================
 # Contact Endpoints
 # =============================================================================
 
@@ -144,6 +182,7 @@ class SplitContactResponse(BaseModel):
 async def list_contacts(
     db: AsyncSession = Depends(get_database_session),
     pagination: PaginationParams = Depends(get_pagination_params),
+    user_id: UUID | None = Query(None, description="Filter by user ID"),
     search: str | None = Query(None, description="Search in contact name or email"),
     platform: str | None = Query(None, description="Filter by platform identity"),
     has_email: bool | None = Query(None, description="Filter contacts with email"),
@@ -155,6 +194,7 @@ async def list_contacts(
     Args:
         db: Database session
         pagination: Pagination parameters
+        user_id: Optional user ID filter
         search: Optional search term
         platform: Optional platform filter
         has_email: Optional email filter
@@ -166,6 +206,11 @@ async def list_contacts(
     # Build query
     query = select(Contact)
     count_query = select(func.count(Contact.id))
+    
+    # Apply user filter if provided
+    if user_id:
+        query = query.where(Contact.user_id == user_id)
+        count_query = count_query.where(Contact.user_id == user_id)
     
     # Apply filters
     filters = []
@@ -253,6 +298,146 @@ async def list_contacts(
         total=total,
         skip=pagination.skip,
         limit=pagination.limit
+    )
+
+
+@router.get(
+    "/inbox",
+    response_model=InboxResponse,
+    summary="Get Inbox (Contacts with Messages)",
+    description="Get ONLY contacts that have messages, sorted by last message time. For all contacts, use listContacts."
+)
+async def get_inbox(
+    db: AsyncSession = Depends(get_database_session),
+    user_id: UUID | None = Query(None, description="User ID"),
+    platform: str | None = Query(None, description="Filter by platform"),
+    search: str | None = Query(None, description="Search contacts"),
+    limit: int = Query(50, ge=1, le=1000, description="Max contacts"),
+    skip: int = Query(0, ge=0, description="Offset"),
+) -> InboxResponse:
+    """
+    Get inbox view: ONLY contacts with messages, sorted by recency.
+    
+    This is optimized for the messaging UI:
+    - Only shows contacts that have at least one message
+    - Sorted by last message timestamp (most recent first)
+    - Includes message preview and platform info
+    
+    NOTE: This is different from listContacts which shows ALL contacts.
+    """
+    from sqlalchemy import text
+    
+    # Use raw SQL for performance
+    # INNER JOIN to only get contacts that have messages
+    sql = text("""
+        WITH contact_last_messages AS (
+            SELECT DISTINCT ON (c.id)
+                c.id as contact_id,
+                c.canonical_name,
+                c.emails,
+                c.phones,
+                c.platform_identities,
+                c.contact_metadata,
+                m.id as message_id,
+                m.content->>'text' as message_text,
+                m.platform as message_platform,
+                m.timestamp as message_timestamp,
+                m.message_metadata as message_metadata
+            FROM contacts c
+            INNER JOIN messages m ON (
+                -- Match by phone (if message has sender_phone)
+                (m.message_metadata->>'sender_phone' IS NOT NULL AND 
+                 m.message_metadata->>'sender_phone' = ANY(c.phones))
+                OR
+                -- Match by WhatsApp identity
+                (m.platform = 'WHATSAPP' AND 
+                 c.platform_identities->>'whatsapp' IS NOT NULL AND
+                 c.platform_identities->>'whatsapp' = m.message_metadata->>'sender_phone')
+            )
+            WHERE (CAST(:user_id_str AS VARCHAR) IS NULL OR c.user_id = CAST(:user_id_str AS UUID))
+            ORDER BY c.id, m.timestamp DESC NULLS LAST
+        )
+        SELECT 
+            contact_id as id,
+            canonical_name,
+            emails,
+            phones,
+            platform_identities,
+            contact_metadata,
+            message_id,
+            message_text,
+            message_platform,
+            message_timestamp,
+            message_metadata
+        FROM contact_last_messages
+        ORDER BY message_timestamp DESC NULLS LAST, canonical_name
+        LIMIT :limit OFFSET :skip
+    """)
+    
+    # Execute query
+    result = await db.execute(sql, {
+        "user_id_str": str(user_id) if user_id else None,
+        "limit": limit,
+        "skip": skip
+    })
+    rows = result.fetchall()
+    
+    # Get total count of contacts WITH messages
+    count_sql = text("""
+        SELECT COUNT(DISTINCT c.id) FROM contacts c
+        INNER JOIN messages m ON (
+            (m.message_metadata->>'sender_phone' IS NOT NULL AND 
+             m.message_metadata->>'sender_phone' = ANY(c.phones))
+            OR
+            (m.platform = 'WHATSAPP' AND 
+             c.platform_identities->>'whatsapp' IS NOT NULL AND
+             c.platform_identities->>'whatsapp' = m.message_metadata->>'sender_phone')
+        )
+        WHERE (CAST(:user_id_str AS VARCHAR) IS NULL OR c.user_id = CAST(:user_id_str AS UUID))
+    """)
+    count_result = await db.execute(count_sql, {"user_id_str": str(user_id) if user_id else None})
+    total = count_result.scalar() or 0
+    
+    # Build response
+    inbox_contacts = []
+    for row in rows:
+        # Extract platforms from platform_identities
+        platforms = list(row.platform_identities.keys()) if row.platform_identities else []
+        
+        # Extract avatar from metadata
+        avatar_url = None
+        if row.contact_metadata:
+            avatar_url = row.contact_metadata.get("avatar_url")
+        
+        # Build last message info
+        last_message_info = None
+        if row.message_id:
+            last_message_info = LastMessageInfo(
+                message_id=row.message_id,
+                content=row.message_text[:100] if row.message_text else None,
+                platform=row.message_platform,
+                timestamp=row.message_timestamp,
+                sender_name=None,
+                is_from_me=False
+            )
+        
+        inbox_contacts.append(InboxContact(
+            id=row.id,
+            canonical_name=row.canonical_name,
+            emails=row.emails,
+            phones=row.phones,
+            platform_identities=row.platform_identities,
+            avatar_url=avatar_url,
+            last_message=last_message_info,
+            unread_count=0,
+            platforms=platforms
+        ))
+    
+    return InboxResponse(
+        contacts=inbox_contacts,
+        total=total,
+        skip=skip,
+        limit=limit
     )
 
 
@@ -723,6 +908,172 @@ async def split_contact(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to split contact: {str(e)}"
+        )
+
+
+# =============================================================================
+# Contact Sync Endpoints
+# =============================================================================
+
+class DeviceContact(BaseModel):
+    """Device contact for sync."""
+    name: str = Field(..., min_length=1, max_length=255)
+    emails: list[str] | None = None
+    phones: list[str] | None = None
+
+
+class ContactSyncRequest(BaseModel):
+    """Request to sync device contacts."""
+    contacts: list[DeviceContact] = Field(..., description="Contacts from device")
+
+
+class ContactSyncResponse(BaseModel):
+    """Sync result."""
+    created: int = Field(description="New contacts created")
+    updated: int = Field(description="Existing contacts updated")
+    duplicates_skipped: int = Field(description="Duplicates found and skipped")
+    total_processed: int = Field(description="Total contacts processed")
+
+
+def normalize_phone(phone: str) -> str:
+    """Normalize phone number for comparison."""
+    # Keep only digits
+    digits = ''.join(filter(str.isdigit, phone))
+    # Return last 10 digits (handles country codes)
+    return digits[-10:] if len(digits) >= 10 else digits
+
+
+async def find_duplicate_contact(
+    db: AsyncSession,
+    user_id: UUID,
+    emails: list[str] | None,
+    phones: list[str] | None
+) -> Contact | None:
+    """Find existing contact by matching email or phone."""
+    
+    # Fetch user's contacts
+    result = await db.execute(
+        select(Contact).where(Contact.user_id == user_id)
+    )
+    contacts = result.scalars().all()
+    
+    # Check by email first (most reliable)
+    if emails:
+        email_set = {e.lower() for e in emails}
+        for contact in contacts:
+            if contact.emails:
+                contact_emails = {e.lower() for e in contact.emails}
+                if email_set & contact_emails:  # Intersection
+                    return contact
+    
+    # Then by phone (normalized)
+    if phones:
+        phone_set = {normalize_phone(p) for p in phones if len(normalize_phone(p)) >= 7}
+        for contact in contacts:
+            if contact.phones:
+                contact_phones = {normalize_phone(p) for p in contact.phones if len(normalize_phone(p)) >= 7}
+                if phone_set & contact_phones:
+                    return contact
+    
+    return None
+
+
+@router.post(
+    "/sync",
+    response_model=ContactSyncResponse,
+    summary="Sync Device Contacts",
+    description="Import and sync contacts from device, handling duplicates"
+)
+async def sync_contacts(
+    user_id: UUID = Query(..., description="User ID"),
+    request: ContactSyncRequest = ...,
+    db: AsyncSession = Depends(get_database_session),
+) -> ContactSyncResponse:
+    """
+    Sync contacts from device.
+    
+    Handles deduplication by matching:
+    - Email addresses (case-insensitive)
+    - Phone numbers (normalized, last 10 digits)
+    
+    For duplicates, merges new info into existing contact.
+    """
+    created = 0
+    updated = 0
+    duplicates_skipped = 0
+    
+    try:
+        for device_contact in request.contacts:
+            # Skip contacts without identifiers
+            if not device_contact.emails and not device_contact.phones:
+                continue
+            
+            # Check for existing duplicate
+            existing = await find_duplicate_contact(
+                db, user_id,
+                device_contact.emails,
+                device_contact.phones
+            )
+            
+            if existing:
+                # Check if we need to update
+                changed = False
+                
+                # Merge emails
+                if device_contact.emails:
+                    current_emails = set(existing.emails or [])
+                    new_emails = {e.lower() for e in device_contact.emails}
+                    if new_emails - {e.lower() for e in current_emails}:
+                        existing.emails = list(current_emails | set(device_contact.emails))
+                        changed = True
+                
+                # Merge phones
+                if device_contact.phones:
+                    current_phones = set(existing.phones or [])
+                    current_normalized = {normalize_phone(p) for p in current_phones}
+                    new_normalized = {normalize_phone(p) for p in device_contact.phones}
+                    if new_normalized - current_normalized:
+                        existing.phones = list(current_phones | set(device_contact.phones))
+                        changed = True
+                
+                if changed:
+                    updated += 1
+                else:
+                    duplicates_skipped += 1
+            else:
+                # Create new contact
+                contact = Contact(
+                    id=uuid4(),
+                    user_id=user_id,
+                    canonical_name=device_contact.name,
+                    emails=device_contact.emails,
+                    phones=device_contact.phones,
+                    platform_identities={},
+                    contact_metadata={
+                        "source": "device_sync",
+                        "synced_at": datetime.utcnow().isoformat()
+                    }
+                )
+                db.add(contact)
+                created += 1
+        
+        await db.commit()
+        
+        logger.info(f"Contact sync for user {user_id}: created={created}, updated={updated}, dupes={duplicates_skipped}")
+        
+        return ContactSyncResponse(
+            created=created,
+            updated=updated,
+            duplicates_skipped=duplicates_skipped,
+            total_processed=len(request.contacts)
+        )
+        
+    except Exception as e:
+        await db.rollback()
+        logger.error(f"Failed to sync contacts: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to sync contacts: {str(e)}"
         )
 
 

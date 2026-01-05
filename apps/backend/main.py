@@ -17,9 +17,10 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from api.routes import health, connections, collection, messages, contacts, threads
+from api.routes import health, connections, collection, messages, contacts, threads, auth, whatsapp, chats, ai
 from config.config import settings
 from db.session import get_engine, init_db
+
 
 # Configure logging
 logging.basicConfig(
@@ -48,10 +49,20 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         logger.info("Initializing database...")
         await init_db()
         logger.info("Database initialized successfully")
-        
+
+        # Initialize connector cache
+        logger.info("Starting connector cache...")
+        from services.connector_cache import get_connector_cache
+        cache = get_connector_cache()
+        await cache.start()
+        logger.info("Connector cache started")
+
         # TODO: Initialize Redis connection
         # TODO: Initialize event bus
-        # TODO: Start background workers
+        # Start background workers
+        from services.tasks.message_collection import start_collection_worker
+        start_collection_worker(interval_seconds=30)
+        logger.info("Background tasks started")
         
         logger.info("R.E.M.I Backend started successfully")
         
@@ -65,15 +76,22 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     logger.info("Shutting down R.E.M.I Backend...")
     
     try:
+        # Stop background workers
+        from services.tasks.message_collection import stop_collection_worker
+        stop_collection_worker()
+
+        # Stop connector cache
+        logger.info("Stopping connector cache...")
+        from services.connector_cache import get_connector_cache
+        cache = get_connector_cache()
+        await cache.stop()
+        logger.info("Connector cache stopped")
+
         # Close database connections
         logger.info("Closing database connections...")
         engine = get_engine()
         await engine.dispose()
         logger.info("Database connections closed")
-        
-        # TODO: Close Redis connections
-        # TODO: Stop background workers
-        # TODO: Clean up resources
         
         logger.info("R.E.M.I Backend shut down successfully")
         
@@ -127,8 +145,12 @@ app.include_router(health.router, prefix="/api/v1", tags=["Health"])
 app.include_router(connections.router, prefix="/api/v1/connections", tags=["Connections"])
 app.include_router(collection.router, prefix="/api/v1/collection", tags=["Collection"])
 app.include_router(messages.router, prefix="/api/v1/messages", tags=["Messages"])
+app.include_router(chats.router, prefix="/api/v1/chats", tags=["Chats"])
 app.include_router(contacts.router, prefix="/api/v1/contacts", tags=["Contacts"])
 app.include_router(threads.router, prefix="/api/v1/threads", tags=["Threads"])
+app.include_router(auth.router, prefix="/api/v1/auth", tags=["Auth"])
+app.include_router(whatsapp.router, prefix="/api/v1/whatsapp", tags=["WhatsApp"])
+app.include_router(ai.router, prefix="/api/v1/ai", tags=["AI"])
 
 # Root endpoint
 @app.get("/", tags=["Root"])

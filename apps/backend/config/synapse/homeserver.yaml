@@ -1,0 +1,86 @@
+# =============================================================================
+# Synapse (Matrix Homeserver) Configuration for Syncline
+# =============================================================================
+# This is a minimal homeserver configuration for local development.
+# For production, use the full generated config.
+# =============================================================================
+
+server_name: "localhost"
+pid_file: /data/homeserver.pid
+public_baseurl: http://localhost:8008/
+
+# Listeners
+listeners:
+  - port: 8008
+    tls: false
+    type: http
+    x_forwarded: true
+    bind_addresses: ['::']
+    resources:
+      - names: [client, federation]
+        compress: false
+
+# Database (using PostgreSQL from docker-compose)
+database:
+  name: psycopg2
+  args:
+    user: postgres
+    password: password
+    database: synapse
+    host: postgres
+    port: 5432
+    cp_min: 5
+    cp_max: 10
+
+# Logging
+log_config: "/data/localhost.log.config"
+
+# Media storage
+media_store_path: /data/media_store
+uploads_path: /data/uploads
+
+# Registration settings
+enable_registration: true
+enable_registration_without_verification: true
+registration_shared_secret: "syncline-matrix-secret-change-me"
+
+# Rate limiting (relaxed for dev)
+rc_message:
+  per_second: 100
+  burst_count: 100
+
+rc_registration:
+  per_second: 1
+  burst_count: 5
+
+rc_login:
+  address:
+    per_second: 1
+    burst_count: 5
+  account:
+    per_second: 1
+    burst_count: 5
+
+# Application services (bridges)
+app_service_config_files:
+  - /data/whatsapp-registration.yaml
+
+# Signing key (auto-generated on first run)
+signing_key_path: "/data/localhost.signing.key"
+
+# Trusted key servers
+trusted_key_servers:
+  - server_name: "matrix.org"
+
+# Enable URL previews (optional)
+url_preview_enabled: false
+
+# Retention policy
+retention:
+  enabled: false
+
+# Report stats
+report_stats: false
+
+# Encryption
+enable_group_e2ee: true

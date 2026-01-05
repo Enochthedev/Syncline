@@ -269,6 +269,74 @@ async def system_stats(
 
 
 # =============================================================================
+# Admin Endpoints
+# =============================================================================
+
+class CleanupResponse(BaseModel):
+    """Cleanup operation response."""
+    
+    timestamp: str = Field(description="Cleanup timestamp")
+    inactive_cleanup: Dict[str, Any] = Field(default_factory=dict)
+    revoked_cleanup: Dict[str, Any] = Field(default_factory=dict)
+    total_deleted: int = Field(default=0)
+    error: str | None = None
+
+
+@router.post(
+    "/admin/cleanup-connections",
+    response_model=CleanupResponse,
+    summary="Cleanup Stale Connections",
+    description="Remove inactive and old revoked connections (admin only)"
+)
+async def cleanup_connections(
+    db: AsyncSession = Depends(get_database_session),
+    dry_run: bool = False
+) -> CleanupResponse:
+    """
+    Clean up stale connections.
+    
+    Removes:
+    - Inactive connections older than 24 hours
+    - Revoked connections older than 30 days
+    
+    Args:
+        db: Database session
+        dry_run: If True, only return what would be deleted
+        
+    Returns:
+        CleanupResponse: Cleanup statistics
+    """
+    from services.tasks.connection_cleanup import (
+        cleanup_inactive_connections,
+        cleanup_revoked_connections
+    )
+    
+    result = CleanupResponse(timestamp=datetime.utcnow().isoformat())
+    
+    try:
+        # Cleanup inactive connections (24 hours)
+        result.inactive_cleanup = await cleanup_inactive_connections(
+            db, max_age_hours=24, dry_run=dry_run
+        )
+        
+        # Cleanup revoked connections (30 days)
+        result.revoked_cleanup = await cleanup_revoked_connections(
+            db, max_age_days=30, dry_run=dry_run
+        )
+        
+        result.total_deleted = (
+            result.inactive_cleanup.get("deleted", 0) +
+            result.revoked_cleanup.get("deleted", 0)
+        )
+        
+    except Exception as e:
+        logger.error(f"Cleanup failed: {e}")
+        result.error = str(e)
+    
+    return result
+
+
+# =============================================================================
 # Helper Functions
 # =============================================================================
 
@@ -344,6 +412,61 @@ async def get_database_stats(db: AsyncSession) -> Dict[str, Any]:
         stats["error"] = str(e)
     
     return stats
+
+
+# =============================================================================
+# Collection Worker Endpoints
+# =============================================================================
+
+@router.post(
+    "/collection/start",
+    summary="Start Message Collection Worker",
+    description="Start background message collection"
+)
+async def start_collection():
+    """Start the background message collection worker."""
+    from services.tasks.message_collection import start_collection_worker
+    
+    start_collection_worker(interval_seconds=30)
+    
+    return {
+        "status": "started",
+        "message": "Message collection worker started (30s interval)"
+    }
+
+
+@router.post(
+    "/collection/stop",
+    summary="Stop Message Collection Worker",
+    description="Stop background message collection"
+)
+async def stop_collection():
+    """Stop the background message collection worker."""
+    from services.tasks.message_collection import stop_collection_worker
+    
+    stop_collection_worker()
+    
+    return {
+        "status": "stopped",
+        "message": "Message collection worker stopped"
+    }
+
+
+@router.post(
+    "/collection/run",
+    summary="Run Collection Cycle",
+    description="Manually trigger a message collection cycle"
+)
+async def run_collection():
+    """Manually run a collection cycle."""
+    from services.tasks.message_collection import run_collection_cycle
+    
+    stats = await run_collection_cycle()
+    
+    return {
+        "status": "completed",
+        "stats": stats
+    }
 
 
 # =============================================================================

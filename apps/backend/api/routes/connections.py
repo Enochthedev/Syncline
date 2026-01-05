@@ -10,8 +10,14 @@ Endpoints for managing platform connections:
 """
 
 import logging
+import os
 from typing import List
+from urllib.parse import urlencode
 from uuid import UUID, uuid4
+
+# Ensure .env is loaded for OAuth credentials
+from dotenv import load_dotenv
+load_dotenv()
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from pydantic import BaseModel, Field
@@ -32,6 +38,8 @@ from integrations.discord_connector import DiscordConnector
 from integrations.whatsapp_connector import WhatsAppConnector
 from integrations.twitter_connector import TwitterConnector
 from integrations.telegram_connector import TelegramConnector
+from integrations.linkedin_connector import LinkedInConnector
+from integrations.google_chat_connector import GoogleChatConnector
 from services.event_bus import get_event_bus
 from services.events.types import ConnectionEvent, EventType
 
@@ -130,8 +138,95 @@ def _get_connector_class(platform: PlatformType):
         PlatformType.WHATSAPP: WhatsAppConnector,
         PlatformType.TWITTER: TwitterConnector,
         PlatformType.TELEGRAM: TelegramConnector,
+        PlatformType.LINKEDIN: LinkedInConnector,
+        PlatformType.GOOGLE_CHAT: GoogleChatConnector,
     }
     return connector_map.get(platform)
+
+
+def _generate_oauth_url(platform: PlatformType, state: str) -> str:
+    """
+    Generate OAuth authorization URL for a platform.
+    
+    Args:
+        platform: The platform to generate URL for
+        state: OAuth state parameter for CSRF protection
+        
+    Returns:
+        Authorization URL string
+    """
+    if platform == PlatformType.GMAIL:
+        # Gmail OAuth 2.0
+        client_id = os.getenv("GMAIL_CLIENT_ID", "")
+        redirect_uri = os.getenv(
+            "GMAIL_REDIRECT_URI",
+            "http://localhost:8000/api/v1/connections/callback/gmail"
+        )
+        scopes = os.getenv(
+            "GMAIL_SCOPES",
+            "https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.modify https://www.googleapis.com/auth/userinfo.email"
+        )
+        
+        params = {
+            "client_id": client_id,
+            "redirect_uri": redirect_uri,
+            "response_type": "code",
+            "scope": scopes,
+            "access_type": "offline",
+            "prompt": "consent",
+            "state": state,
+        }
+        return f"https://accounts.google.com/o/oauth2/v2/auth?{urlencode(params)}"
+    
+    elif platform == PlatformType.LINKEDIN:
+        # LinkedIn OAuth 2.0
+        client_id = os.getenv("LINKEDIN_CLIENT_ID", "")
+        redirect_uri = os.getenv(
+            "LINKEDIN_REDIRECT_URI",
+            "http://localhost:8000/api/v1/connections/callback/linkedin"
+        )
+        scopes = os.getenv("LINKEDIN_SCOPES", "r_liteprofile r_emailaddress w_member_social")
+        # LinkedIn uses space-separated scopes
+        scopes = scopes.replace(",", " ")
+        
+        params = {
+            "response_type": "code",
+            "client_id": client_id,
+            "redirect_uri": redirect_uri,
+            "scope": scopes,
+            "state": state,
+        }
+        return f"https://www.linkedin.com/oauth/v2/authorization?{urlencode(params)}"
+    
+    elif platform == PlatformType.GOOGLE_CHAT:
+        # Google Chat OAuth 2.0 (uses same credentials as Gmail, different scopes)
+        client_id = os.getenv("GMAIL_CLIENT_ID", "")
+        redirect_uri = os.getenv(
+            "GOOGLE_CHAT_REDIRECT_URI",
+            "http://localhost:8000/api/v1/connections/callback/google_chat"
+        )
+        # Google Chat scopes
+        scopes = (
+            "https://www.googleapis.com/auth/chat.spaces.readonly "
+            "https://www.googleapis.com/auth/chat.messages.readonly "
+            "https://www.googleapis.com/auth/chat.messages.create "
+            "https://www.googleapis.com/auth/chat.memberships.readonly"
+        )
+        
+        params = {
+            "client_id": client_id,
+            "redirect_uri": redirect_uri,
+            "response_type": "code",
+            "scope": scopes,
+            "access_type": "offline",
+            "prompt": "consent",
+            "state": state,
+        }
+        return f"https://accounts.google.com/o/oauth2/v2/auth?{urlencode(params)}"
+    
+    else:
+        # Placeholder for other platforms
+        return f"https://oauth.{platform.value}.com/authorize?state={state}"
 
 
 async def _emit_connection_event(
@@ -232,23 +327,27 @@ async def initiate_connection(
             )
         
         # Create pending connection record
+        # Store the client's redirect_uri so we can redirect back to the app after OAuth
+        oauth_state = str(uuid4())
         connection = PlatformConnection(
             id=uuid4(),
             user_id=request.user_id,
             platform=platform,
             credentials={},  # Will be populated after OAuth
             status=ConnectionStatus.INACTIVE,
-            platform_metadata={"oauth_state": str(uuid4())}
+            platform_metadata={
+                "oauth_state": oauth_state,
+                "client_redirect_uri": request.redirect_uri,  # Store for callback
+            }
         )
         
         db.add(connection)
         await db.commit()
         await db.refresh(connection)
         
-        # Generate OAuth URL (platform-specific implementation)
-        # For now, return a placeholder - actual implementation depends on platform
+        # Generate OAuth URL based on platform
         oauth_state = connection.platform_metadata.get("oauth_state", "")
-        authorization_url = f"https://oauth.{platform.value}.com/authorize?state={oauth_state}"
+        authorization_url = _generate_oauth_url(platform, oauth_state)
         
         logger.info(
             f"Initiated {platform.value} connection for user {request.user_id}, "
@@ -273,17 +372,17 @@ async def initiate_connection(
 
 @router.get(
     "/callback/{platform}",
-    response_model=ConnectionResponse,
-    status_code=status.HTTP_200_OK,
+    status_code=status.HTTP_302_FOUND,
     summary="OAuth callback handler",
-    description="Handle OAuth callback and complete connection"
+    description="Handle OAuth callback, exchange code for tokens, and redirect to app"
 )
 async def oauth_callback(
     platform: PlatformType,
     code: str = Query(..., description="Authorization code"),
     state: str = Query(..., description="OAuth state parameter"),
+    error: str | None = Query(None, description="OAuth error"),
     db: AsyncSession = Depends(get_database_session)
-) -> ConnectionResponse:
+):
     """
     Handle OAuth callback and complete platform connection.
     
@@ -291,20 +390,111 @@ async def oauth_callback(
     1. Validates OAuth state parameter
     2. Exchanges authorization code for access token
     3. Updates connection with credentials
-    4. Emits CONNECTION_ESTABLISHED event
-    
-    Args:
-        platform: Platform being connected
-        code: Authorization code from OAuth provider
-        state: State parameter for verification
-        db: Database session
-    
-    Returns:
-        Updated connection details
-    
-    Raises:
-        HTTPException: If state invalid or OAuth exchange fails
+    4. Redirects back to mobile app with deep link
     """
+    from fastapi.responses import RedirectResponse, HTMLResponse
+    import httpx
+    from datetime import datetime, timedelta
+    
+    # App deep link scheme
+    APP_SCHEME = os.getenv("APP_DEEP_LINK_SCHEME", "syncline")
+    
+    def create_html_response(success: bool, platform: str, message: str, connection_id: str | None = None):
+        """Create HTML page for web browsers with deep link and fallback."""
+        status_color = "#4CAF50" if success else "#F44336"
+        status_icon = "✓" if success else "✗"
+        status_text = "Connected!" if success else "Connection Failed"
+        
+        deep_link = f"{APP_SCHEME}://connection/{'success' if success else 'error'}?platform={platform}"
+        if connection_id:
+            deep_link += f"&connection_id={connection_id}"
+        if not success:
+            deep_link += f"&error={message}"
+        
+        return HTMLResponse(content=f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>{status_text}</title>
+            <style>
+                body {{
+                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    min-height: 100vh;
+                    margin: 0;
+                    background: #f5f5f5;
+                }}
+                .container {{
+                    text-align: center;
+                    padding: 40px;
+                    background: white;
+                    border-radius: 16px;
+                    box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+                    max-width: 400px;
+                }}
+                .icon {{
+                    font-size: 64px;
+                    color: {status_color};
+                    margin-bottom: 20px;
+                }}
+                h1 {{
+                    margin: 0 0 12px;
+                    color: #1a1a1a;
+                }}
+                p {{
+                    color: #666;
+                    margin: 0 0 24px;
+                }}
+                .btn {{
+                    display: inline-block;
+                    background: #6366F1;
+                    color: white;
+                    padding: 14px 32px;
+                    border-radius: 12px;
+                    text-decoration: none;
+                    font-weight: 600;
+                    margin-top: 16px;
+                }}
+                .btn:hover {{
+                    background: #4F46E5;
+                }}
+                .note {{
+                    margin-top: 24px;
+                    font-size: 14px;
+                    color: #999;
+                }}
+            </style>
+            <script>
+                // Try to redirect to app immediately
+                window.location.href = "{deep_link}";
+            </script>
+        </head>
+        <body>
+            <div class="container">
+                <div class="icon">{status_icon}</div>
+                <h1>{status_text}</h1>
+                <p>{message}</p>
+                <a href="{deep_link}" class="btn">Open in Syncline App</a>
+                <p class="note">If the app doesn't open automatically, tap the button above.</p>
+            </div>
+        </body>
+        </html>
+        """, status_code=200)
+    
+    # Handle OAuth errors
+    if error:
+        logger.error(f"OAuth error for {platform.value}: {error}")
+        return create_html_response(
+            success=False,
+            platform=platform.value,
+            message=f"OAuth error: {error}"
+        )
+    
+    connection = None
     try:
         # Find connection by state
         result = await db.execute(
@@ -316,22 +506,113 @@ async def oauth_callback(
         connection = result.scalar_one_or_none()
         
         if not connection:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid OAuth state or connection not found"
+            logger.error(f"OAuth callback: Invalid state {state} for {platform.value}")
+            return create_html_response(
+                success=False,
+                platform=platform.value,
+                message="Invalid OAuth state or connection expired. Please try again."
             )
         
-        # Exchange code for tokens (platform-specific implementation)
-        # For now, store placeholder credentials
+        # Exchange code for tokens based on platform
+        tokens = None
+        
+        if platform in [PlatformType.GMAIL, PlatformType.GOOGLE_CHAT]:
+            # Google OAuth token exchange
+            client_id = os.getenv("GMAIL_CLIENT_ID")
+            client_secret = os.getenv("GMAIL_CLIENT_SECRET")
+            
+            if platform == PlatformType.GMAIL:
+                redirect_uri = os.getenv(
+                    "GMAIL_REDIRECT_URI",
+                    "http://localhost:8000/api/v1/connections/callback/gmail"
+                )
+            else:
+                redirect_uri = os.getenv(
+                    "GOOGLE_CHAT_REDIRECT_URI",
+                    "http://localhost:8000/api/v1/connections/callback/google_chat"
+                )
+            
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    "https://oauth2.googleapis.com/token",
+                    data={
+                        "grant_type": "authorization_code",
+                        "code": code,
+                        "redirect_uri": redirect_uri,
+                        "client_id": client_id,
+                        "client_secret": client_secret,
+                    },
+                    headers={"Content-Type": "application/x-www-form-urlencoded"},
+                )
+                
+                if response.status_code != 200:
+                    logger.error(f"Google token exchange failed: {response.text}")
+                    return create_html_response(
+                        success=False,
+                        platform=platform.value,
+                        message="Failed to exchange authorization code. Please try again."
+                    )
+                
+                tokens = response.json()
+        
+        elif platform == PlatformType.LINKEDIN:
+            # LinkedIn OAuth token exchange
+            client_id = os.getenv("LINKEDIN_CLIENT_ID")
+            client_secret = os.getenv("LINKEDIN_CLIENT_SECRET")
+            redirect_uri = os.getenv(
+                "LINKEDIN_REDIRECT_URI",
+                "http://localhost:8000/api/v1/connections/callback/linkedin"
+            )
+            
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    "https://www.linkedin.com/oauth/v2/accessToken",
+                    data={
+                        "grant_type": "authorization_code",
+                        "code": code,
+                        "redirect_uri": redirect_uri,
+                        "client_id": client_id,
+                        "client_secret": client_secret,
+                    },
+                    headers={"Content-Type": "application/x-www-form-urlencoded"},
+                )
+                
+                if response.status_code != 200:
+                    logger.error(f"LinkedIn token exchange failed: {response.text}")
+                    return create_html_response(
+                        success=False,
+                        platform=platform.value,
+                        message="Failed to exchange authorization code. Please try again."
+                    )
+                
+                tokens = response.json()
+        
+        else:
+            # For other platforms, store placeholder (needs implementation)
+            tokens = {
+                "access_token": f"token_{code[:10]}",
+                "token_type": "Bearer",
+            }
+        
+        # Calculate expiration
+        expires_in = tokens.get("expires_in", 3600)
+        expires_at = (datetime.utcnow() + timedelta(seconds=expires_in)).isoformat()
+        
+        # Update connection with real credentials
         connection.credentials = {
-            "access_token": f"token_{code[:10]}",
-            "refresh_token": f"refresh_{code[:10]}",
-            "expires_at": "2024-12-31T23:59:59Z"
+            "access_token": tokens.get("access_token"),
+            "refresh_token": tokens.get("refresh_token"),
+            "token_type": tokens.get("token_type", "Bearer"),
+            "expires_in": expires_in,
+            "expires_at": expires_at,
+            "scope": tokens.get("scope"),
+            "client_id": os.getenv(f"{platform.value.upper()}_CLIENT_ID") or os.getenv("GMAIL_CLIENT_ID"),
+            "client_secret": os.getenv(f"{platform.value.upper()}_CLIENT_SECRET") or os.getenv("GMAIL_CLIENT_SECRET"),
         }
         connection.status = ConnectionStatus.ACTIVE
         connection.platform_metadata = {
             **connection.platform_metadata,
-            "oauth_completed_at": "2024-11-10T00:00:00Z"
+            "oauth_completed_at": datetime.utcnow().isoformat(),
         }
         
         await db.commit()
@@ -350,10 +631,29 @@ async def oauth_callback(
             f"connection_id={connection.id}"
         )
         
-        return _connection_to_response(connection)
+        # Check if client provided a redirect URI (for mobile apps)
+        client_redirect_uri = connection.platform_metadata.get("client_redirect_uri")
+        
+        if client_redirect_uri:
+            # Use HTTP redirect for mobile app (works with WebBrowser.openAuthSessionAsync)
+            from urllib.parse import urlencode
+            params = urlencode({
+                "platform": platform.value,
+                "connection_id": str(connection.id),
+                "status": "success"
+            })
+            redirect_url = f"{client_redirect_uri}?{params}"
+            logger.info(f"Redirecting to client: {redirect_url}")
+            return RedirectResponse(url=redirect_url, status_code=302)
+        else:
+            # Fallback to HTML page for web browsers
+            return create_html_response(
+                success=True,
+                platform=platform.value,
+                message=f"Successfully connected to {platform.value.replace('_', ' ').title()}!",
+                connection_id=str(connection.id)
+            )
     
-    except HTTPException:
-        raise
     except Exception as e:
         logger.error(f"OAuth callback failed: {e}")
         
@@ -366,10 +666,22 @@ async def oauth_callback(
                 connection.user_id,
                 error=str(e)
             )
+            
+            # Check for client redirect URI
+            client_redirect_uri = connection.platform_metadata.get("client_redirect_uri")
+            if client_redirect_uri:
+                from urllib.parse import urlencode
+                params = urlencode({
+                    "platform": platform.value,
+                    "status": "error",
+                    "error": str(e)[:100]
+                })
+                return RedirectResponse(url=f"{client_redirect_uri}?{params}", status_code=302)
         
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"OAuth callback failed: {str(e)}"
+        return create_html_response(
+            success=False,
+            platform=platform.value,
+            message=f"Connection failed: {str(e)[:100]}"
         )
 
 
@@ -436,6 +748,72 @@ async def list_connections(
         )
 
 
+@router.patch(
+    "/{connection_id}/status",
+    response_model=ConnectionResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Update connection status",
+    description="Update the status of a connection (used after WhatsApp bridge login)"
+)
+async def update_connection_status(
+    connection_id: UUID,
+    new_status: ConnectionStatus = Query(..., description="New connection status"),
+    db: AsyncSession = Depends(get_database_session)
+) -> ConnectionResponse:
+    """
+    Update connection status.
+    
+    Used to mark a connection as ACTIVE after successful login (e.g., WhatsApp bridge).
+    
+    Args:
+        connection_id: Connection ID to update
+        new_status: New status value
+        db: Database session
+    
+    Returns:
+        Updated connection details
+    """
+    try:
+        result = await db.execute(
+            select(PlatformConnection).where(
+                PlatformConnection.id == connection_id
+            )
+        )
+        connection = result.scalar_one_or_none()
+        
+        if not connection:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Connection {connection_id} not found"
+            )
+        
+        connection.status = new_status
+        await db.commit()
+        await db.refresh(connection)
+        
+        # Emit appropriate event
+        if new_status == ConnectionStatus.ACTIVE:
+            await _emit_connection_event(
+                EventType.CONNECTION_ESTABLISHED,
+                connection.id,
+                connection.platform.value,
+                connection.user_id
+            )
+        
+        logger.info(f"Updated connection {connection_id} status to {new_status.value}")
+        
+        return _connection_to_response(connection)
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to update connection status: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to update status: {str(e)}"
+        )
+
+
 @router.delete(
     "/{connection_id}",
     status_code=status.HTTP_204_NO_CONTENT,
@@ -443,7 +821,7 @@ async def list_connections(
     description="Disconnect and remove a platform connection"
 )
 async def disconnect_platform(
-    connection_id: str = Depends(validate_uuid),
+    connection_id: str,
     db: AsyncSession = Depends(get_database_session)
 ) -> None:
     """

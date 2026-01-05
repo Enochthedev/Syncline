@@ -1,0 +1,23 @@
+# WhatsApp Bridge Appservice Registration
+# This file tells Synapse about the mautrix-whatsapp bridge
+
+id: whatsapp
+url: http://whatsapp-bridge:29318
+as_token: 17c18049c5abfaeabb273ff06a31166412d8cc1261b899ec3ab1ad7a7b4d1a01
+hs_token: 818cbeca817ce973760a5d40536332953c2927472c7c64ea7325ff9d6414295e
+
+# Namespaces define which users/rooms/aliases the bridge manages
+sender_localpart: whatsappbot
+namespaces:
+  users:
+    - exclusive: true
+      regex: '@whatsapp_.*:localhost'
+  aliases:
+    - exclusive: true
+      regex: '#whatsapp_.*:localhost'
+
+# Enable rate limiting bypass for the bridge
+rate_limited: false
+
+# Enable push for faster message delivery
+push_ephemeral: true

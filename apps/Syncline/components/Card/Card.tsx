@@ -34,7 +34,7 @@ export const Card: React.FC<CardProps> = ({
         <View
             style={[
                 styles.card,
-                { padding: theme.spacing[padding] },
+                padding && { padding: theme.spacing[padding] },
                 getVariantStyle(),
                 style,
             ]}

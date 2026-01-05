@@ -100,6 +100,62 @@ services:
       - remi_network
 
   # ===========================================================================
+  # Matrix Synapse (Homeserver for WhatsApp Bridge)
+  # ===========================================================================
+  synapse:
+    image: matrixdotorg/synapse:latest
+    container_name: remi_synapse
+    environment:
+      - SYNAPSE_SERVER_NAME=localhost
+      - SYNAPSE_REPORT_STATS=no
+      - UID=0
+      - GID=0
+    ports:
+      - "8008:8008"
+    volumes:
+      # Use bind mount for data directory (writable)
+      - ./data/synapse:/data
+      # Mount config files directly to /data where Synapse expects them
+      - ./config/synapse/homeserver.yaml:/data/homeserver.yaml:ro
+      - ./config/synapse/whatsapp-registration.yaml:/data/whatsapp-registration.yaml:ro
+      - ./config/synapse/localhost.log.config:/data/localhost.log.config:ro
+      - ./config/synapse/localhost.signing.key:/data/localhost.signing.key:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8008/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    networks:
+      - remi_network
+
+  # ===========================================================================
+  # mautrix-whatsapp (WhatsApp Bridge)
+  # ===========================================================================
+  whatsapp-bridge:
+    image: dock.mau.dev/mautrix/whatsapp:latest
+    container_name: remi_whatsapp_bridge
+    ports:
+      - "29318:29318"  # Provisioning API
+    volumes:
+      - whatsapp_bridge_data:/data
+      # Mount config file directly to /data where mautrix expects it
+      - ./config/mautrix-whatsapp/config.yaml:/data/config.yaml:ro
+    depends_on:
+      synapse:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    environment:
+      - MAUTRIX_DIRECT_STARTUP=true
+    networks:
+      - remi_network
+    restart: unless-stopped
+
+  # ===========================================================================
   # Backend API (Optional - for full stack development)
   # ===========================================================================
   # Uncomment to run the backend API in Docker
@@ -153,3 +209,6 @@ volumes:
     driver: local
   chromadb_data:
     driver: local
+  whatsapp_bridge_data:
+    driver: local
+

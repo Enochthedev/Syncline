@@ -10,6 +10,7 @@ Available Connectors:
 - WhatsAppConnector: WhatsApp integration via Mautrix bridge
 - TwitterConnector: Twitter/X integration with OAuth 1.0a/2.0
 - TelegramConnector: Telegram integration with Bot API
+- LinkedInConnector: LinkedIn integration with OAuth 2.0
 
 All connectors inherit from BaseConnector and provide:
 - OAuth authentication and token management
@@ -36,6 +37,7 @@ from integrations.discord_connector import DiscordConnector
 from integrations.whatsapp_connector import WhatsAppConnector
 from integrations.twitter_connector import TwitterConnector
 from integrations.telegram_connector import TelegramConnector
+from integrations.linkedin_connector import LinkedInConnector
 
 from integrations.token_manager import TokenManager, create_token_manager
 from integrations.rate_limiter import RateLimiter, get_rate_limiter
@@ -62,6 +64,7 @@ __all__ = [
     "WhatsAppConnector",
     "TwitterConnector",
     "TelegramConnector",
+    "LinkedInConnector",
     
     # Utilities
     "TokenManager",
@@ -69,3 +72,4 @@ __all__ = [
     "RateLimiter",
     "get_rate_limiter",
 ]
+
