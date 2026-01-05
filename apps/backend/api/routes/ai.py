@@ -8,12 +8,14 @@ Provides AI-powered functionality:
 - Contact insights and analytics
 - Similar message finding
 - Natural language queries
+- Communication pattern analysis
 """
 
 import logging
-from datetime import datetime
-from typing import Optional
+from datetime import datetime, timedelta
+from typing import Optional, Dict
 from uuid import UUID
+import random
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
@@ -162,6 +164,80 @@ class NaturalLanguageQueryResponse(BaseModel):
     answer: str
     sources: list[MessageSearchResult]
     confidence: float
+
+
+class MemoryRecommendationContext(BaseModel):
+    """Context for generating recommendations."""
+    
+    current_contact: Optional[str] = Field(default=None, description="Current contact ID")
+    current_thread: Optional[str] = Field(default=None, description="Current thread ID")
+    current_platform: Optional[str] = Field(default=None, description="Current platform")
+    keywords: Optional[list[str]] = Field(default=None, description="Relevant keywords")
+
+
+class MemoryRecommendationItem(BaseModel):
+    """A single memory recommendation."""
+    
+    id: str
+    type: str = Field(description="Recommendation type: commitment, follow_up, relationship, context")
+    title: str
+    description: str
+    priority: float = Field(ge=0.0, le=1.0, description="Priority score")
+    memory_id: Optional[str] = None
+    contact_id: Optional[str] = None
+    action: Optional[str] = None
+    metadata: dict = Field(default_factory=dict)
+
+
+class MemoryRecommendationsResponse(BaseModel):
+    """Response model for memory recommendations."""
+    
+    recommendations: list[MemoryRecommendationItem]
+    total: int
+
+
+class MemoryStatsResponse(BaseModel):
+    """Response model for memory statistics."""
+    
+    total_memories: int = 0
+    memories_by_type: dict = Field(default_factory=dict)
+    memories_by_importance: dict = Field(default_factory=dict)
+    recent_memories_count: int = 0
+    active_commitments: int = 0
+
+
+# Pattern Analysis Models
+class DateRange(BaseModel):
+    start: datetime
+    end: datetime
+
+class AnalyzePatternsRequest(BaseModel):
+    contact_id: Optional[UUID] = None
+    platform: Optional[str] = None
+    date_range: Optional[DateRange] = None
+
+class TopicTrend(BaseModel):
+    topic: str
+    frequency: int
+    trend: str  # increasing, decreasing, stable
+
+class SentimentPoint(BaseModel):
+    date: str
+    sentiment: float
+
+class SentimentAnalysis(BaseModel):
+    overall_sentiment: str  # positive, neutral, negative
+    sentiment_over_time: list[SentimentPoint]
+
+class ResponsePatterns(BaseModel):
+    avg_response_time: float
+    response_rate: float
+
+class AnalyzePatternsResponse(BaseModel):
+    communication_frequency: Dict[str, int]
+    topic_trends: list[TopicTrend]
+    sentiment_analysis: SentimentAnalysis
+    response_patterns: ResponsePatterns
 
 
 # =============================================================================
@@ -759,7 +835,7 @@ If the messages don't contain enough information to answer the question, say so.
 
         return NaturalLanguageQueryResponse(
             question=request.question,
-            answer=answer.strip(),
+            answer=answer,
             sources=results,
             confidence=confidence,
         )
@@ -768,5 +844,54 @@ If the messages don't contain enough information to answer the question, say so.
         logger.error(f"Natural language query failed: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Query processing failed: {str(e)}"
+            detail=f"Query failed: {str(e)}"
+        )
+
+@router.post(
+    "/analyze/patterns",
+    response_model=AnalyzePatternsResponse,
+    summary="Analyze Communication Patterns",
+    description="Analyze communication patterns, trends, and sentiment"
+)
+async def analyze_patterns(
+    request: AnalyzePatternsRequest,
+    db: AsyncSession = Depends(get_database_session),
+) -> AnalyzePatternsResponse:
+    """
+    Analyze communication patterns for a contact or generally.
+    
+    Generates mock data for now to support the daily summary feature.
+    """
+    try:
+        # Mock Response
+        # In a real implementation, this would aggregate data from DB
+        
+        return AnalyzePatternsResponse(
+            communication_frequency={
+                "whatsapp": random.randint(5, 50),
+                "slack": random.randint(10, 30),
+                "discord": random.randint(2, 15)
+            },
+            topic_trends=[
+                TopicTrend(topic="Project A", frequency=12, trend="increasing"),
+                TopicTrend(topic="Meeting", frequency=8, trend="stable"),
+                TopicTrend(topic="Lunch", frequency=5, trend="decreasing")
+            ],
+            sentiment_analysis=SentimentAnalysis(
+                overall_sentiment="positive",
+                sentiment_over_time=[
+                    SentimentPoint(date=(datetime.now() - timedelta(days=i)).isoformat(), sentiment=0.5 + (random.random() * 0.4))
+                    for i in range(7)
+                ]
+            ),
+            response_patterns=ResponsePatterns(
+                avg_response_time=15.5,
+                response_rate=0.85
+            )
+        )
+    except Exception as e:
+        logger.error(f"Pattern analysis failed: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Pattern analysis failed: {str(e)}"
         )

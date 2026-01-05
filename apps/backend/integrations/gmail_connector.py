@@ -530,3 +530,81 @@ class GmailConnector(BaseConnector):
             return None
         delta = self._watch_expiration - datetime.utcnow()
         return max(0, int(delta.total_seconds()))
+
+
+# =============================================================================
+# Gmail OAuth Helper Functions
+# =============================================================================
+
+def get_gmail_config() -> Dict[str, Any]:
+    """
+    Get Gmail OAuth configuration from environment variables.
+    
+    Returns:
+        Dictionary with Gmail OAuth config:
+        - client_id: Google app client ID
+        - client_secret: Google app client secret
+        - redirect_uri: OAuth callback URL
+        - scopes: List of OAuth scopes
+        
+    Raises:
+        ValueError: If required environment variables are missing
+    """
+    import os
+    
+    client_id = os.getenv("GMAIL_CLIENT_ID")
+    client_secret = os.getenv("GMAIL_CLIENT_SECRET")
+    redirect_uri = os.getenv(
+        "GMAIL_REDIRECT_URI",
+        "http://localhost:8000/api/v1/connections/callback/gmail"
+    )
+    scopes_str = os.getenv(
+        "GMAIL_SCOPES",
+        "https://www.googleapis.com/auth/gmail.readonly,https://www.googleapis.com/auth/gmail.modify"
+    )
+    
+    if not client_id or not client_secret:
+        raise ValueError(
+            "Gmail OAuth not configured. Set GMAIL_CLIENT_ID and "
+            "GMAIL_CLIENT_SECRET environment variables."
+        )
+    
+    # Parse scopes (comma or space separated)
+    scopes = [s.strip() for s in scopes_str.replace(",", " ").split() if s.strip()]
+    
+    return {
+        "client_id": client_id,
+        "client_secret": client_secret,
+        "redirect_uri": redirect_uri,
+        "scopes": scopes,
+    }
+
+
+def is_gmail_configured() -> bool:
+    """
+    Check if Gmail OAuth is properly configured.
+    
+    Returns:
+        True if Gmail credentials are set and valid
+    """
+    import os
+    
+    client_id = os.getenv("GMAIL_CLIENT_ID", "")
+    client_secret = os.getenv("GMAIL_CLIENT_SECRET", "")
+    
+    # Check for placeholder values
+    placeholders = ["your-", "your_", "placeholder", "xxx"]
+    
+    if not client_id or not client_secret:
+        return False
+    
+    for placeholder in placeholders:
+        if placeholder in client_id.lower() or placeholder in client_secret.lower():
+            return False
+    
+    # Validate Gmail client ID format
+    if not client_id.endswith(".apps.googleusercontent.com"):
+        return False
+    
+    return True
+

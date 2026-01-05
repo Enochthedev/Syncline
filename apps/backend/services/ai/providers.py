@@ -2,9 +2,10 @@
 LLM Provider Abstraction
 
 Provides a unified interface for different LLM providers:
-- Ollama (local-first, default)
-- OpenAI (cloud fallback)
-- Anthropic (cloud fallback)
+- OpenRouter (primary, unified access to multiple models)
+- Ollama (local fallback)
+- OpenAI (direct cloud fallback)
+- Anthropic (direct cloud fallback)
 
 Supports model management, text generation, and embeddings.
 """
@@ -174,6 +175,224 @@ class LLMProvider(ABC):
             True if healthy
         """
         pass
+
+
+class OpenRouterProvider(LLMProvider):
+    """
+    OpenRouter LLM provider implementation.
+    
+    Provides unified access to multiple LLM providers through OpenRouter.
+    """
+    
+    def __init__(
+        self,
+        api_key: Optional[str] = None,
+        base_url: Optional[str] = None,
+        timeout: Optional[int] = None,
+        max_retries: Optional[int] = None,
+        default_chat_model: Optional[str] = None,
+    ):
+        """
+        Initialize OpenRouter provider.
+        
+        Args:
+            api_key: OpenRouter API key
+            base_url: OpenRouter API base URL
+            timeout: Request timeout
+            max_retries: Max retry attempts
+            default_chat_model: Default chat model
+        """
+        super().__init__(
+            base_url=base_url or settings.OPENROUTER_BASE_URL,
+            timeout=timeout or settings.OPENROUTER_TIMEOUT,
+            max_retries=max_retries or settings.OPENROUTER_MAX_RETRIES,
+        )
+        self.api_key = api_key or settings.OPENROUTER_API_KEY
+        self.default_chat_model = default_chat_model or settings.DEFAULT_CHAT_MODEL
+        
+        if not self.api_key:
+            logger.warning("OpenRouter API key not provided")
+        
+        logger.info(
+            f"Initialized OpenRouter provider at {self.base_url} "
+            f"(chat: {self.default_chat_model})"
+        )
+    
+    async def _get_session(self) -> aiohttp.ClientSession:
+        """Get or create aiohttp session with OpenRouter headers."""
+        if self._session is None or self._session.closed:
+            timeout = aiohttp.ClientTimeout(total=self.timeout)
+            headers = {
+                "Authorization": f"Bearer {self.api_key}",
+                "Content-Type": "application/json",
+                "HTTP-Referer": "https://github.com/your-org/remi",  # Optional
+                "X-Title": "R.E.M.I Backend",  # Optional
+            }
+            self._session = aiohttp.ClientSession(
+                timeout=timeout,
+                headers=headers
+            )
+        return self._session
+    
+    async def _request(
+        self,
+        method: str,
+        endpoint: str,
+        json_data: Optional[dict] = None,
+    ) -> Any:
+        """
+        Make an HTTP request to OpenRouter API with retries.
+        
+        Args:
+            method: HTTP method
+            endpoint: API endpoint
+            json_data: JSON request body
+            
+        Returns:
+            Response data
+        """
+        session = await self._get_session()
+        url = f"{self.base_url}/{endpoint.lstrip('/')}"
+        
+        for attempt in range(self.max_retries):
+            try:
+                async with session.request(
+                    method,
+                    url,
+                    json=json_data,
+                ) as response:
+                    response.raise_for_status()
+                    return await response.json()
+                    
+            except aiohttp.ClientError as e:
+                if attempt == self.max_retries - 1:
+                    logger.error(f"OpenRouter request failed after {self.max_retries} attempts: {e}")
+                    raise
+                
+                # Exponential backoff
+                wait_time = 2 ** attempt
+                logger.warning(f"OpenRouter request failed (attempt {attempt + 1}), retrying in {wait_time}s: {e}")
+                await asyncio.sleep(wait_time)
+        
+        raise RuntimeError("Max retries exceeded")
+    
+    async def generate(
+        self,
+        prompt: str,
+        model: Optional[str] = None,
+        config: Optional[GenerationConfig] = None,
+    ) -> str:
+        """Generate text from a prompt using OpenRouter."""
+        model = model or self.default_chat_model
+        config = config or GenerationConfig()
+        
+        # Convert prompt to messages format
+        messages = [{"role": "user", "content": prompt}]
+        return await self.chat(messages, model, config)
+    
+    async def chat(
+        self,
+        messages: list[dict[str, str]],
+        model: Optional[str] = None,
+        config: Optional[GenerationConfig] = None,
+    ) -> str:
+        """Generate a chat response using OpenRouter."""
+        model = model or self.default_chat_model
+        config = config or GenerationConfig()
+        
+        request_data = {
+            "model": model,
+            "messages": messages,
+            "temperature": config.temperature,
+            "max_tokens": config.max_tokens,
+            "top_p": config.top_p,
+            "stream": config.stream,
+        }
+        
+        if config.stop:
+            request_data["stop"] = config.stop
+        
+        logger.debug(f"Generating chat response with model {model}")
+        response = await self._request("POST", "/chat/completions", request_data)
+        
+        choices = response.get("choices", [])
+        if not choices:
+            logger.warning("No choices in OpenRouter response")
+            return ""
+        
+        message = choices[0].get("message", {})
+        return message.get("content", "")
+    
+    async def embed(
+        self,
+        text: str | list[str],
+        model: Optional[str] = None,
+    ) -> list[list[float]]:
+        """
+        Generate embeddings using OpenRouter.
+        
+        Note: Not all models on OpenRouter support embeddings.
+        Falls back to local embedding model if available.
+        """
+        # OpenRouter doesn't have a standard embeddings endpoint
+        # Fall back to local embedding service
+        logger.warning("OpenRouter embeddings not supported, falling back to local")
+        
+        # Try to use Ollama for embeddings
+        try:
+            ollama = OllamaProvider()
+            return await ollama.embed(text, model)
+        except Exception as e:
+            logger.error(f"Failed to generate embeddings: {e}")
+            # Return empty embeddings as fallback
+            texts = [text] if isinstance(text, str) else text
+            return [[] for _ in texts]
+    
+    async def list_models(self) -> list[ModelInfo]:
+        """List available OpenRouter models."""
+        try:
+            response = await self._request("GET", "/models")
+            models_data = response.get("data", [])
+            
+            models = []
+            for model_data in models_data:
+                model_info = ModelInfo(
+                    name=model_data.get("id", ""),
+                    type=ModelType.CHAT,
+                    size=None,  # Not provided by OpenRouter
+                    parameters=None,
+                    quantization=None,
+                    family=model_data.get("id", "").split("/")[0] if "/" in model_data.get("id", "") else None,
+                    available=True,
+                )
+                models.append(model_info)
+            
+            logger.info(f"Found {len(models)} OpenRouter models")
+            return models
+            
+        except Exception as e:
+            logger.error(f"Failed to list OpenRouter models: {e}")
+            return []
+    
+    async def pull_model(self, model: str) -> bool:
+        """
+        Pull/download a model.
+        
+        OpenRouter models are always available, no pulling needed.
+        """
+        logger.info(f"OpenRouter model {model} is always available")
+        return True
+    
+    async def health_check(self) -> bool:
+        """Check if OpenRouter is accessible."""
+        try:
+            # Try to list models as a health check
+            await self._request("GET", "/models")
+            logger.debug("OpenRouter health check passed")
+            return True
+        except Exception as e:
+            logger.warning(f"OpenRouter health check failed: {e}")
+            return False
 
 
 class OllamaProvider(LLMProvider):
@@ -414,7 +633,7 @@ def get_llm_provider(provider_name: Optional[str] = None) -> LLMProvider:
     Get an LLM provider instance.
     
     Args:
-        provider_name: Provider name ('ollama', 'openai', 'anthropic')
+        provider_name: Provider name ('openrouter', 'ollama', 'openai', 'anthropic')
                       Uses DEFAULT_LLM_PROVIDER from settings if not specified
     
     Returns:
@@ -426,7 +645,9 @@ def get_llm_provider(provider_name: Optional[str] = None) -> LLMProvider:
     provider_name = provider_name or settings.DEFAULT_LLM_PROVIDER
     provider_name = provider_name.lower()
     
-    if provider_name == "ollama":
+    if provider_name == "openrouter":
+        return OpenRouterProvider()
+    elif provider_name == "ollama":
         return OllamaProvider()
     elif provider_name == "openai":
         # TODO: Implement OpenAI provider
@@ -440,6 +661,7 @@ def get_llm_provider(provider_name: Optional[str] = None) -> LLMProvider:
 
 __all__ = [
     "LLMProvider",
+    "OpenRouterProvider",
     "OllamaProvider",
     "ModelType",
     "ModelInfo",

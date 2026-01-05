@@ -7,8 +7,9 @@ import {
     TouchableOpacity,
     ScrollView,
     Alert,
-    Linking,
 } from 'react-native';
+import * as WebBrowser from 'expo-web-browser';
+import * as Linking from 'expo-linking';
 import { GmailIcon } from '../../components/GmailIcon/GmailIcon';
 import { AppleIcon } from '../../components/AppleIcon/AppleIcon';
 import { FacebookIcon } from '../../components/FacebookIcon/FacebookIcon';
@@ -24,6 +25,10 @@ import { Platform } from '../../src/types';
 import { Card } from '../Card/Card';
 import { Badge } from '../Badge/Badge';
 import { connectionsAPI } from '../../src/api/endpoints/connections';
+import { WhatsAppConnectModal } from '../WhatsAppConnect/WhatsAppConnectModal';
+
+// Ensure any pending auth sessions are completed
+WebBrowser.maybeCompleteAuthSession();
 
 const IconMap: Record<Platform, React.FC<{ size?: number; color?: string }>> = {
     gmail: GmailIcon,
@@ -32,6 +37,8 @@ const IconMap: Record<Platform, React.FC<{ size?: number; color?: string }>> = {
     telegram: TelegramIcon,
     twitter: TwitterIcon,
     whatsapp: WhatsAppIcon,
+    linkedin: GmailIcon, // TODO: Create LinkedInIcon
+    google_chat: GmailIcon, // TODO: Create GoogleChatIcon
 };
 
 const PLATFORM_CONFIG: Record<Platform, {
@@ -40,6 +47,7 @@ const PLATFORM_CONFIG: Record<Platform, {
     label: string;
     gradient: [string, string];
     description: string;
+    connectionType: 'oauth' | 'qr' | 'bot';
 }> = {
     gmail: {
         icon: 'gmail',
@@ -47,6 +55,7 @@ const PLATFORM_CONFIG: Record<Platform, {
         label: 'Gmail',
         gradient: ['#EA4335', '#C5221F'],
         description: 'Connect your Gmail account to sync emails and messages',
+        connectionType: 'oauth',
     },
     slack: {
         icon: 'slack',
@@ -54,6 +63,7 @@ const PLATFORM_CONFIG: Record<Platform, {
         label: 'Slack',
         gradient: ['#4A154B', '#611f69'],
         description: 'Sync Slack workspaces and direct messages',
+        connectionType: 'oauth',
     },
     discord: {
         icon: 'discord',
@@ -61,6 +71,7 @@ const PLATFORM_CONFIG: Record<Platform, {
         label: 'Discord',
         gradient: ['#5865F2', '#404EBC'],
         description: 'Connect Discord servers and channels',
+        connectionType: 'oauth',
     },
     telegram: {
         icon: 'telegram',
@@ -68,6 +79,7 @@ const PLATFORM_CONFIG: Record<Platform, {
         label: 'Telegram',
         gradient: ['#0088CC', '#006699'],
         description: 'Sync Telegram chats and groups',
+        connectionType: 'bot',
     },
     twitter: {
         icon: 'twitter',
@@ -75,13 +87,31 @@ const PLATFORM_CONFIG: Record<Platform, {
         label: 'X (Twitter)',
         gradient: ['#000000', '#14171A'],
         description: 'Connect your X (formerly Twitter) account',
+        connectionType: 'oauth',
     },
     whatsapp: {
         icon: 'whatsapp',
         iconFamily: 'FontAwesome5',
         label: 'WhatsApp',
         gradient: ['#25D366', '#1DA851'],
-        description: 'Sync WhatsApp conversations',
+        description: 'Sync WhatsApp conversations via QR code',
+        connectionType: 'qr',
+    },
+    linkedin: {
+        icon: 'logo-linkedin',
+        iconFamily: 'Ionicons',
+        label: 'LinkedIn',
+        gradient: ['#0077B5', '#005582'],
+        description: 'Connect your LinkedIn account for professional messaging',
+        connectionType: 'oauth',
+    },
+    google_chat: {
+        icon: 'chatbubbles',
+        iconFamily: 'Ionicons',
+        label: 'Google Chat',
+        gradient: ['#00AC47', '#0F9D58'],
+        description: 'Sync Google Chat messages and spaces',
+        connectionType: 'oauth',
     },
 };
 
@@ -103,37 +133,61 @@ export const ConnectionModal: React.FC<ConnectionModalProps> = ({
     const config = PLATFORM_CONFIG[platform];
     const [loading, setLoading] = useState(false);
 
+    // If WhatsApp is selected, show the dedicated WhatsApp modal
+    if (platform === 'whatsapp') {
+        return (
+            <WhatsAppConnectModal
+                visible={visible}
+                userId={userId}
+                onClose={onClose}
+                onConnected={(connectionId) => {
+                    onConnect(connectionId);
+                    onClose();
+                }}
+            />
+        );
+    }
+
     const handleConnect = async () => {
         setLoading(true);
 
         try {
+            // Get the redirect URI that matches our app scheme
+            const redirectUri = Linking.createURL('connection/success');
+
             // Step 1: Initiate OAuth flow with backend
             const response = await connectionsAPI.initiateConnection(
                 platform,
                 userId,
-                // Deep link for mobile app to return after OAuth
-                'syncline://oauth/callback'
+                redirectUri
             );
 
-            // Step 2: Open OAuth URL in browser
-            const canOpen = await Linking.canOpenURL(response.authorization_url);
-            if (!canOpen) {
-                throw new Error('Cannot open authorization URL');
+            // Step 2: Open OAuth URL using WebBrowser.openAuthSessionAsync
+            // This properly handles returning to the app after OAuth
+            const result = await WebBrowser.openAuthSessionAsync(
+                response.authorization_url,
+                redirectUri
+            );
+
+            if (result.type === 'success') {
+                // OAuth completed, the backend callback handled token exchange
+                onConnect(response.connection_id);
+                onClose();
+                Alert.alert(
+                    'Success!',
+                    `Successfully connected to ${config.label}!`,
+                    [{ text: 'OK' }]
+                );
+            } else if (result.type === 'cancel') {
+                // User cancelled
+                Alert.alert(
+                    'Cancelled',
+                    'OAuth was cancelled. You can try again anytime.',
+                    [{ text: 'OK' }]
+                );
+            } else {
+                throw new Error('OAuth session failed');
             }
-
-            await Linking.openURL(response.authorization_url);
-
-            // User completes OAuth in browser/external app
-            // The callback will be handled by deep linking
-            // For now, close modal and show success
-            onConnect(response.connection_id);
-            onClose();
-
-            Alert.alert(
-                'OAuth Started',
-                `Complete the ${config.label} authorization in your browser. The app will reconnect automatically.`,
-                [{ text: 'OK' }]
-            );
 
         } catch (error: any) {
             console.error('Connection error:', error);

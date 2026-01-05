@@ -6,27 +6,39 @@ import { Ionicons } from '@expo/vector-icons';
 import { GoogleIcon } from '../../components/GoogleIcon/GoogleIcon';
 import { AppleIcon } from '../../components/AppleIcon/AppleIcon';
 import { FacebookIcon } from '../../components/FacebookIcon/FacebookIcon';
+import { useAuth } from '../../src/contexts/AuthContext';
 
 export default function LoginScreen() {
     const router = useRouter();
-    const [email, setEmail] = useState('');
+    const { login, isAuthenticated } = useAuth();
+    const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
 
+    // Redirect if already authenticated
+    React.useEffect(() => {
+        if (isAuthenticated) {
+            router.replace('/(tabs)');
+        }
+    }, [isAuthenticated]);
+
     const handleLogin = async () => {
-        if (!email || !password) {
-            Alert.alert('Error', 'Please enter email and password');
+        if (!username || !password) {
+            Alert.alert('Error', 'Please enter username and password');
             return;
         }
 
-        setLoading(true);
-        // Simulate API call
-        setTimeout(() => {
+        try {
+            setLoading(true);
+            await login(username, password);
+            // Navigation handled by AuthContext effect above
+        } catch (error: any) {
+            console.error(error);
+            Alert.alert('Login Failed', error.response?.data?.detail || 'Invalid credentials');
+        } finally {
             setLoading(false);
-            // Navigate to main app
-            router.replace('/(tabs)');
-        }, 1000);
+        }
     };
 
     const handleSocialLogin = (provider: string) => {
@@ -43,14 +55,14 @@ export default function LoginScreen() {
 
             <View style={styles.form}>
                 <View style={styles.inputContainer}>
-                    <Text style={styles.label}>Email</Text>
+                    <Text style={styles.label}>Username</Text>
                     <TextInput
                         style={styles.input}
-                        placeholder="Enter your email"
-                        value={email}
-                        onChangeText={setEmail}
+                        placeholder="Enter your username"
+                        value={username}
+                        onChangeText={setUsername}
                         autoCapitalize="none"
-                        keyboardType="email-address"
+                        autoCorrect={false}
                     />
                 </View>
 

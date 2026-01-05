@@ -8,6 +8,8 @@ import { theme } from '../../src/theme';
 interface MessageItemProps {
     message: Message;
     onPress: () => void;
+    showSender?: boolean;
+    isInChat?: boolean;
 }
 
 const getPlatformColor = (platform: Platform) => {
@@ -22,30 +24,87 @@ const getPlatformColor = (platform: Platform) => {
     return colors[platform] || theme.colors.textSecondary;
 };
 
-export const MessageItem: React.FC<MessageItemProps> = ({ message, onPress }) => {
-    const platformColor = getPlatformColor(message.platform);
-    const date = new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+const formatTime = (timestamp: string) => {
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffHours = diffMs / (1000 * 60 * 60);
+    
+    if (diffHours < 1) {
+        return 'now';
+    } else if (diffHours < 24) {
+        return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    } else {
+        return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+    }
+};
 
-    // TODO: Animation - Slide in on new message
-    // TODO: Animation - Highlight on search match
+export const MessageItem: React.FC<MessageItemProps> = ({ 
+    message, 
+    onPress, 
+    showSender = true,
+    isInChat = false 
+}) => {
+    const platformColor = getPlatformColor(message.platform);
+    const timeStr = formatTime(message.timestamp);
+
+    // Clean sender name - remove Matrix IDs and show readable names
+    const cleanSender = (sender: string) => {
+        // If it's a Matrix ID like @whatsapp_1234567890:localhost
+        if (sender.includes('@whatsapp_') && sender.includes(':')) {
+            const phoneMatch = sender.split('@whatsapp_')[1]?.split(':')[0];
+            if (phoneMatch) {
+                return `+${phoneMatch}`;
+            }
+        }
+        
+        // If it's already a clean name, return as is
+        if (!sender.includes('@') || sender.includes(' ')) {
+            return sender;
+        }
+        
+        // Fallback for other Matrix-style IDs
+        return sender.split('@')[0] || sender;
+    };
+
+    const displaySender = cleanSender(message.sender);
 
     return (
         <TouchableOpacity onPress={onPress} activeOpacity={0.7}>
-            <Card padding="m" shadow="sm" style={styles.container}>
+            <Card 
+                padding="m" 
+                shadow="sm" 
+                style={[
+                    styles.container,
+                    isInChat && styles.chatContainer
+                ]}
+            >
                 <View style={styles.header}>
-                    <View style={[styles.avatar, { backgroundColor: platformColor + '20' }]}>
-                        <Text style={[styles.avatarText, { color: platformColor }]}>
-                            {message.sender[0].toUpperCase()}
-                        </Text>
-                    </View>
-
-                    <View style={styles.contentContainer}>
-                        <View style={styles.headerRow}>
-                            <Text style={styles.sender}>{message.sender}</Text>
-                            <Text style={styles.time}>{date}</Text>
+                    {showSender && (
+                        <View style={[styles.avatar, { backgroundColor: platformColor + '20' }]}>
+                            <Text style={[styles.avatarText, { color: platformColor }]}>
+                                {displaySender[0]?.toUpperCase() || '?'}
+                            </Text>
                         </View>
+                    )}
 
-                        <Text style={styles.content} numberOfLines={2}>
+                    <View style={[styles.contentContainer, !showSender && styles.contentFullWidth]}>
+                        {showSender && (
+                            <View style={styles.headerRow}>
+                                <Text style={styles.sender} numberOfLines={1}>
+                                    {displaySender}
+                                </Text>
+                                <Text style={styles.time}>{timeStr}</Text>
+                            </View>
+                        )}
+
+                        <Text 
+                            style={[
+                                styles.content,
+                                !showSender && styles.contentNoSender
+                            ]} 
+                            numberOfLines={isInChat ? undefined : 2}
+                        >
                             {message.content}
                         </Text>
 
@@ -56,6 +115,10 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message, onPress }) =>
 
                             {message.has_attachments && (
                                 <Text style={styles.attachmentIcon}>📎</Text>
+                            )}
+                            
+                            {!showSender && (
+                                <Text style={styles.timeFooter}>{timeStr}</Text>
                             )}
                         </View>
                     </View>
@@ -68,6 +131,10 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message, onPress }) =>
 const styles = StyleSheet.create({
     container: {
         marginBottom: theme.spacing.s,
+    },
+    chatContainer: {
+        marginBottom: theme.spacing.xs,
+        backgroundColor: theme.colors.surface,
     },
     header: {
         flexDirection: 'row',
@@ -88,6 +155,9 @@ const styles = StyleSheet.create({
         flex: 1,
         gap: theme.spacing.xs,
     },
+    contentFullWidth: {
+        marginLeft: 0,
+    },
     headerRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
@@ -95,13 +165,20 @@ const styles = StyleSheet.create({
     },
     sender: {
         ...theme.typography.h4,
+        flex: 1,
     },
     time: {
         ...theme.typography.caption,
+        color: theme.colors.textSecondary,
     },
     content: {
         ...theme.typography.body,
-        color: theme.colors.textSecondary,
+        color: theme.colors.text,
+        lineHeight: 20,
+    },
+    contentNoSender: {
+        ...theme.typography.body,
+        marginBottom: theme.spacing.xs,
     },
     footer: {
         flexDirection: 'row',
@@ -110,5 +187,10 @@ const styles = StyleSheet.create({
     },
     attachmentIcon: {
         fontSize: 14,
+    },
+    timeFooter: {
+        ...theme.typography.caption,
+        color: theme.colors.textSecondary,
+        marginLeft: 'auto',
     },
 });

@@ -1,0 +1,138 @@
+# =============================================================================
+# mautrix-whatsapp Bridge Configuration for Syncline
+# =============================================================================
+# This config connects WhatsApp to Matrix via the mautrix-whatsapp bridge.
+# The bridge lets you receive/send WhatsApp messages through Matrix protocol.
+# =============================================================================
+
+# Homeserver connection
+homeserver:
+  # Matrix homeserver address
+  address: http://synapse:8008
+  # The domain of the homeserver
+  domain: localhost
+  # Use async_media for faster uploads
+  async_media: false
+
+# Application Service registration
+appservice:
+  # The address the bridge will listen on for incoming events from Synapse
+  hostname: 0.0.0.0
+  port: 29318
+  
+  # The unique ID for this appservice
+  id: whatsapp
+  # The bot username
+  bot:
+    username: whatsappbot
+    displayname: WhatsApp Bridge Bot
+    avatar: mxc://maunium.net/NeXNQarUbrlYBiPCpprYsRqr
+  
+  # Ephemeral events for better typing indicators, read receipts
+  ephemeral_events: true
+  
+  # AS and HS tokens (auto-generated, but we set reasonable defaults)
+  as_token: "17c18049c5abfaeabb273ff06a31166412d8cc1261b899ec3ab1ad7a7b4d1a01"
+  hs_token: "818cbeca817ce973760a5d40536332953c2927472c7c64ea7325ff9d6414295e"
+
+# Bridge settings
+bridge:
+  # The displayname template for WhatsApp users
+  displayname_template: "{{if .BusinessName}}{{.BusinessName}}{{else if .PushName}}{{.PushName}}{{else}}{{.JID}}{{end}} (WA)"
+  
+  # Username template for ghost users
+  username_template: "whatsapp_{{.}}"
+  
+  # Should the bridge sync with double puppeting?
+  double_puppet_server_map: {}
+  double_puppet_allow_discovery: false
+  
+  # Relay mode - allow non-logged-in users to chat via relay
+  relay:
+    enabled: false
+  
+  # Permissions - who can use the bridge
+  permissions:
+    # Allow all local users to use the bridge
+    "localhost": user
+    # Allow specific users to be admins
+    "@admin:localhost": admin
+    "@syncline:localhost": admin
+  
+  # History sync settings
+  history_sync:
+    # Maximum initial conversations to sync
+    max_initial_conversations: 25
+    # Message count per conversation
+    request_full_sync: false
+    full_sync_config:
+      days_limit: 30
+      size_mb_limit: 50
+      storage_quota_mb: 200
+  
+  # Message handling
+  message_handling_timeout:
+    error_after: 0s
+    deadline: 120s
+  
+  # Portal (room) settings
+  portal_message_buffer: 128
+  
+  # Backfill settings
+  backfill:
+    enabled: true
+    max_batch_messages: 100
+    max_batch_count: -1
+  
+  # Media settings
+  media_upload_size: 50  # MB
+  
+  # Commands
+  command_prefix: "!wa"
+  
+  # Personal filtering mode - receive all messages in portal rooms
+  personal_filtering_spaces: true
+
+# Database - use PostgreSQL from docker-compose
+database:
+  type: postgres
+  uri: postgres://postgres:password@postgres:5432/mautrix_whatsapp?sslmode=disable
+  max_open_conns: 20
+  max_idle_conns: 2
+  max_conn_idle_time: null
+  max_conn_lifetime: null
+
+# Logging
+logging:
+  min_level: debug
+  writers:
+    - type: stdout
+      format: pretty-colored
+    - type: file
+      format: json
+      filename: /data/logs/bridge.log
+      max_size: 100
+      max_backups: 10
+      compress: true
+
+# Encryption (disabled for initial setup - can be enabled later)
+encryption:
+  allow: false
+  default: false
+  require: false
+  appservice: false
+  delete_keys:
+    delete_outdated_inbound: false
+    delete_fully_used_on_decrypt: false
+    delete_prev_on_new_session: false
+
+# Metrics (optional)
+metrics:
+  enabled: false
+  listen: 0.0.0.0:8000
+
+# Provisioning API for mobile app integrations
+provisioning:
+  enabled: true
+  prefix: /_matrix/provision
+  shared_secret: "263ab7fc2efa159c1b8e567b567eeef646bc8c596be7c5eef5980ae16b8a6afb"

@@ -31,13 +31,14 @@ export interface ConnectionListResponse {
 export const connectionsAPI = {
     /**
      * Initiate OAuth flow for a platform
+     * Note: baseURL already includes /api/v1
      */
     initiateConnection: async (
         platform: Platform,
         userId: string,
         redirectUri?: string
     ): Promise<InitiateConnectionResponse> => {
-        const { data } = await apiClient.post(`/api/connections/initiate/${platform}`, {
+        const { data } = await apiClient.post(`/connections/initiate/${platform}`, {
             user_id: userId,
             redirect_uri: redirectUri,
         });
@@ -52,7 +53,7 @@ export const connectionsAPI = {
         code: string,
         state: string
     ): Promise<ConnectionResponse> => {
-        const { data } = await apiClient.get(`/api/connections/callback/${platform}`, {
+        const { data } = await apiClient.get(`/connections/callback/${platform}`, {
             params: { code, state },
         });
         return data;
@@ -66,7 +67,7 @@ export const connectionsAPI = {
         platform?: Platform,
         status?: string
     ): Promise<ConnectionListResponse> => {
-        const { data } = await apiClient.get('/api/connections', {
+        const { data } = await apiClient.get('/connections', {
             params: {
                 user_id: userId,
                 platform,
@@ -80,14 +81,25 @@ export const connectionsAPI = {
      * Disconnect a platform
      */
     disconnect: async (connectionId: string): Promise<void> => {
-        await apiClient.delete(`/api/connections/${connectionId}`);
+        await apiClient.delete(`/connections/${connectionId}`);
     },
 
     /**
      * Check connection health
      */
     checkHealth: async (connectionId: string) => {
-        const { data } = await apiClient.get(`/api/connections/${connectionId}/health`);
+        const { data } = await apiClient.get(`/connections/${connectionId}/health`);
+        return data;
+    },
+
+    /**
+     * Update connection status (used after WhatsApp bridge login)
+     */
+    updateStatus: async (connectionId: string, status: 'active' | 'inactive' | 'revoked'): Promise<ConnectionResponse> => {
+        const { data } = await apiClient.patch(`/connections/${connectionId}/status`, null, {
+            params: { new_status: status },
+        });
         return data;
     },
 };
+

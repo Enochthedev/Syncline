@@ -227,6 +227,7 @@ async def list_messages(
     platform: str | None = Query(None, description="Filter by platform"),
     connection_id: UUID | None = Query(None, description="Filter by connection ID"),
     thread_id: str | None = Query(None, description="Filter by thread ID"),
+    contact_id: UUID | None = Query(None, description="Filter by contact ID"),
     start_date: datetime | None = Query(None, description="Filter messages after this date"),
     end_date: datetime | None = Query(None, description="Filter messages before this date"),
     search: str | None = Query(None, description="Search in message content"),
@@ -240,6 +241,7 @@ async def list_messages(
         platform: Optional platform filter
         connection_id: Optional connection ID filter
         thread_id: Optional thread ID filter
+        contact_id: Optional contact ID filter
         start_date: Optional start date filter
         end_date: Optional end date filter
         search: Optional text search in content
@@ -248,7 +250,10 @@ async def list_messages(
         MessageListResponse: Paginated list of messages
     """
     # Build query
-    query = select(Message)
+    query = select(Message).options(
+        selectinload(Message.attachments),
+        selectinload(Message.sender)
+    )
     count_query = select(func.count(Message.id))
     
     # Apply filters
@@ -262,6 +267,11 @@ async def list_messages(
     
     if thread_id:
         filters.append(Message.thread_id == thread_id)
+
+    if contact_id:
+        # Filter messages where the sender belongs to the contact
+        from db.models.participant import Participant
+        filters.append(Message.sender.has(Participant.contact_id == contact_id))
     
     if start_date:
         filters.append(Message.timestamp >= start_date)
@@ -294,27 +304,45 @@ async def list_messages(
     # Convert to response models
     message_responses = []
     for msg in messages:
-        # Extract sender info from metadata
-        sender_info = msg.message_metadata.get("sender", {}) if msg.message_metadata else {}
-        
-        message_responses.append(MessageResponse(
-            id=msg.id,
-            connection_id=msg.connection_id,
-            platform=msg.platform,
-            platform_message_id=msg.platform_message_id,
-            thread_id=msg.thread_id,
-            sender=MessageSender(
-                sender_id=msg.sender_id,
-                platform_user_id=sender_info.get("platform_user_id"),
-                name=sender_info.get("name")
-            ),
-            content=MessageContent(**msg.content),
-            metadata=msg.message_metadata,
-            timestamp=msg.timestamp,
-            collected_at=msg.collected_at,
-            cleaned_at=msg.cleaned_at,
-            attachment_count=len(msg.attachments) if msg.attachments else 0
-        ))
+        try:
+            # Extract sender info from metadata or relationship
+            sender_info = msg.message_metadata.get("sender", {}) if msg.message_metadata else {}
+            sender_name = sender_info.get("name")
+            if not sender_name and msg.sender:
+                sender_name = msg.sender.name
+                
+            platform_user_id = sender_info.get("platform_user_id")
+            if not platform_user_id and msg.sender:
+                 platform_user_id = msg.sender.platform_user_id
+            
+            # Ensure content has required fields or provided defaults
+            content_data = msg.content or {}
+            if "text" not in content_data:
+                content_data["text"] = ""
+            if "format" not in content_data:
+                content_data["format"] = "plain"
+
+            message_responses.append(MessageResponse(
+                id=msg.id,
+                connection_id=msg.connection_id,
+                platform=msg.platform,
+                platform_message_id=msg.platform_message_id,
+                thread_id=msg.thread_id,
+                sender=MessageSender(
+                    sender_id=msg.sender_id,
+                    platform_user_id=platform_user_id,
+                    name=sender_name
+                ),
+                content=MessageContent(**content_data),
+                metadata=msg.message_metadata,
+                timestamp=msg.timestamp,
+                collected_at=msg.collected_at,
+                cleaned_at=msg.cleaned_at,
+                attachment_count=len(msg.attachments) if msg.attachments else 0
+            ))
+        except Exception as e:
+            logger.warning(f"Skipping malformed message {msg.id}: {e}")
+            continue
     
     return MessageListResponse(
         messages=message_responses,

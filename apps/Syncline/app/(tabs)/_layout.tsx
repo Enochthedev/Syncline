@@ -22,12 +22,18 @@ export default function TabLayout() {
                     ios: {
                         height: 85,
                         paddingBottom: 20,
+                        paddingTop: 8,
                     },
                     default: {
                         height: 60,
                         paddingBottom: 10,
+                        paddingTop: 5,
                     },
                 }),
+                tabBarLabelStyle: {
+                    fontSize: 11,
+                    fontWeight: '500',
+                },
                 headerStyle: {
                     backgroundColor: theme.colors.background,
                 },
@@ -53,29 +59,51 @@ export default function TabLayout() {
                 }}
             />
             <Tabs.Screen
-                name="search"
+                name="contacts"
                 options={{
-                    title: 'Search',
-                    tabBarLabel: 'Search',
-                    tabBarIcon: ({ color }) => <TabIcon name="search" color={color} />,
+                    title: 'Contacts',
+                    tabBarLabel: 'Contacts',
+                    tabBarIcon: ({ color }) => <TabIcon name="people" color={color} />,
                 }}
             />
-
-            {/* Hidden Tabs */}
             <Tabs.Screen
                 name="connections"
                 options={{
                     title: 'Connections',
+                    tabBarLabel: 'Connect',
+                    tabBarIcon: ({ color }) => <TabIcon name="git-network" color={color} />,
+                }}
+            />
+            {/* Hidden from tab bar - accessed via navigation from Home or other screens */}
+            <Tabs.Screen
+                name="chat"
+                options={{
                     href: null,
+                    title: 'Chat',
                 }}
             />
             <Tabs.Screen
-                name="settings"
+                name="commitments"
                 options={{
-                    title: 'Settings',
-                    href: null,
+                    href: null, // Hidden - access via Home quick actions
+                    title: 'Commitments',
+                }}
+            />
+            <Tabs.Screen
+                name="nudges"
+                options={{
+                    href: null, // Hidden - access via Home notifications
+                    title: 'Nudges',
+                }}
+            />
+            <Tabs.Screen
+                name="ai-memory"
+                options={{
+                    href: null, // Hidden - access via settings or profile
+                    title: 'AI Memory',
                 }}
             />
         </Tabs>
     );
 }
+

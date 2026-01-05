@@ -1,0 +1,118 @@
+{
+  "timestamp": "2025-12-31T07:04:32.323210",
+  "tests": [
+    {
+      "test": "configuration",
+      "success": true,
+      "details": {
+        "homeserver_url": "http://localhost:8008",
+        "access_token_length": 43,
+        "matrix_user_id": "@syncline:localhost",
+        "bridge_bot_id": "@whatsappbot:localhost"
+      },
+      "error": null,
+      "timestamp": "2025-12-31T07:04:32.337369"
+    },
+    {
+      "test": "database_connectivity",
+      "success": true,
+      "details": null,
+      "error": null,
+      "timestamp": "2025-12-31T07:04:32.374025"
+    },
+    {
+      "test": "find_connections",
+      "success": true,
+      "details": {
+        "count": 1,
+        "connection_ids": [
+          "946fddbd-b258-44db-9e86-858131653d17"
+        ]
+      },
+      "error": null,
+      "timestamp": "2025-12-31T07:04:32.375664"
+    },
+    {
+      "test": "bridge_connectivity_946fddbd-b258-44db-9e86-858131653d17",
+      "success": true,
+      "details": {
+        "user_id": "@syncline:localhost"
+      },
+      "error": null,
+      "timestamp": "2025-12-31T07:04:34.530595"
+    },
+    {
+      "test": "bridge_status_946fddbd-b258-44db-9e86-858131653d17",
+      "success": true,
+      "details": {
+        "connected": false,
+        "logged_in": false,
+        "phone": null
+      },
+      "error": null,
+      "timestamp": "2025-12-31T07:04:38.773704"
+    },
+    {
+      "test": "room_discovery_946fddbd-b258-44db-9e86-858131653d17",
+      "success": true,
+      "details": {
+        "room_count": 27,
+        "rooms": [
+          {
+            "room_id": "!VLdREEkJYpzCwDkGdh:localhost",
+            "name": "!VLdREEkJYpzCwDkGdh:localhost",
+            "is_group": false
+          },
+          {
+            "room_id": "!WKsHFxvqHiUudVdafu:localhost",
+            "name": "!WKsHFxvqHiUudVdafu:localhost",
+            "is_group": false
+          },
+          {
+            "room_id": "!zkhBcUxIRYTlOtvQtm:localhost",
+            "name": "!zkhBcUxIRYTlOtvQtm:localhost",
+            "is_group": false
+          },
+          {
+            "room_id": "!ZtbGPIMYgzDegOUffa:localhost",
+            "name": "!ZtbGPIMYgzDegOUffa:localhost",
+            "is_group": false
+          },
+          {
+            "room_id": "!uDIMVMJXuBaNlmjCfw:localhost",
+            "name": "!uDIMVMJXuBaNlmjCfw:localhost",
+            "is_group": false
+          }
+        ]
+      },
+      "error": null,
+      "timestamp": "2025-12-31T07:04:41.101720"
+    },
+    {
+      "test": "message_fetching_946fddbd-b258-44db-9e86-858131653d17",
+      "success": true,
+      "details": {
+        "room_id": "!VLdREEkJYpzCwDkGdh:localhost",
+        "message_count": 9
+      },
+      "error": null,
+      "timestamp": "2025-12-31T07:04:43.238373"
+    },
+    {
+      "test": "message_sync_946fddbd-b258-44db-9e86-858131653d17",
+      "success": false,
+      "details": null,
+      "error": "All 5 sync attempts failed. Last error: Authentication failed: Matrix auth failed: Invalid Authorization header.",
+      "timestamp": "2025-12-31T07:05:00.330475"
+    },
+    {
+      "test": "database_messages_946fddbd-b258-44db-9e86-858131653d17",
+      "success": true,
+      "details": {
+        "message_count": 598
+      },
+      "error": null,
+      "timestamp": "2025-12-31T07:05:00.366282"
+    }
+  ]
+}

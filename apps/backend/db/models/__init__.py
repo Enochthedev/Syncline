@@ -17,6 +17,7 @@ from db.models.entity import Entity
 from db.models.summary import Summary
 from db.models.embedding import Embedding
 from db.models.collection_job import CollectionJob, JobType, JobStatus
+from db.models.memory import Memory, MemoryType, MemoryImportance
 
 __all__ = [
     "User",
@@ -35,4 +36,7 @@ __all__ = [
     "CollectionJob",
     "JobType",
     "JobStatus",
+    "Memory",
+    "MemoryType",
+    "MemoryImportance",
 ]
