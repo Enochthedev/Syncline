@@ -28,6 +28,61 @@ class WebhookSetupRequest(BaseModel):
     webhook_url: str
 
 
+class ManualSyncRequest(BaseModel):
+    """Request to manually trigger sync."""
+    force: bool = False
+
+
+@router.post("/{connection_id}/sync/manual", summary="Manually Trigger Sync")
+async def trigger_manual_sync(
+    connection_id: UUID,
+    request: ManualSyncRequest,
+    background_tasks: BackgroundTasks,
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_database_session),
+):
+    """
+    Manually trigger WhatsApp message sync.
+    
+    This forces a sync of all rooms/chats from the Matrix bridge.
+    Useful when automatic sync isn't working or user wants fresh data.
+    """
+    connection = await get_user_whatsapp_connection(connection_id, current_user, db)
+    
+    # Check if logged in first
+    session_manager = get_whatsapp_session_manager()
+    status_result = await session_manager.check_login_status(db, connection_id)
+    
+    if not status_result.get("logged_in"):
+        raise HTTPException(
+            status_code=400,
+            detail="WhatsApp not connected. Please login first."
+        )
+    
+    # Trigger sync
+    sync_service = get_whatsapp_sync_service()
+    
+    try:
+        # Run sync in background
+        background_tasks.add_task(
+            sync_service.sync_all_messages,
+            connection_id,
+            db
+        )
+        
+        return {
+            "success": True,
+            "message": "Sync triggered successfully",
+            "connection_id": str(connection_id),
+            "status": "syncing"
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to trigger sync: {str(e)}"
+        )
+
+
 @router.get("/{connection_id}/login/status", summary="Poll Login Status")
 async def poll_login_status(
     connection_id: UUID,
