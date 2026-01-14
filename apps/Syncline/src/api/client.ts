@@ -18,13 +18,15 @@ const getBaseUrl = () => {
         return 'http://10.0.2.2:8000/api/v1';
     }
 
-    // For iOS Simulator or physical device via LAN
-    const debuggerHost = Constants.expoConfig?.hostUri;
-    const localhost = debuggerHost?.split(':')[0] || 'localhost';
-    return `http://${localhost}:8000/api/v1`;
+    // For iOS physical device or simulator - use your Mac's local IP
+    // TODO: Replace with your actual local IP address
+    return 'http://192.168.1.137:8000/api/v1';
 };
 
 export const API_BASE_URL = getBaseUrl();
+
+// Log the API URL for debugging
+console.log('API Client: Base URL configured as:', API_BASE_URL);
 
 export const apiClient = axios.create({
     baseURL: API_BASE_URL,

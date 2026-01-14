@@ -329,16 +329,6 @@ export default function HomeScreen() {
 
                         <TouchableOpacity
                             style={styles.quickAccessItem}
-                            onPress={() => router.push('/screenshot-index')}
-                        >
-                            <View style={[styles.quickAccessIcon, { backgroundColor: '#CFFAFE' }]}>
-                                <Ionicons name="camera-outline" size={24} color="#0891B2" />
-                            </View>
-                            <Text style={styles.quickAccessLabel}>Screenshots</Text>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity
-                            style={styles.quickAccessItem}
                             onPress={() => router.push('/profile')}
                         >
                             <View style={[styles.quickAccessIcon, { backgroundColor: '#D1FAE5' }]}>
