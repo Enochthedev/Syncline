@@ -9,6 +9,7 @@ import { BriefingModal } from '../../components/HomeModals/BriefingModal';
 import { ThreadModal } from '../../components/HomeModals/ThreadModal';
 import { contactsAPI } from '../../src/api/endpoints/contacts';
 import { messagesAPI } from '../../src/api/endpoints/messages';
+import { useAuth } from '../../src/contexts/AuthContext';
 
 const { width } = Dimensions.get('window');
 
@@ -22,9 +23,16 @@ const PLATFORM_CONFIG: Record<string, { icon: string; color: string }> = {
     'telegram': { icon: 'paper-plane', color: '#0088cc' },
 };
 
+// Helper to get greeting based on time of day
+const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Good Morning';
+    if (hour < 18) return 'Good Afternoon';
+    return 'Good Evening';
+};
+
 // Mock Data: AI Daily Briefing (still mock for now)
 const DAILY_BRIEFING = {
-    greeting: "Good Morning, Alex",
     summary: "Based on your last message with **Sarah** on **Slack**, she's waiting for the Q4 designs. Also, **Mike** sent the updated budget on **Gmail** and mentioned you need to review it before the 2 PM meeting.",
     highlighted: true,
 };
@@ -74,10 +82,15 @@ interface RecentThread {
 
 export default function HomeScreen() {
     const router = useRouter();
+    const { user } = useAuth();
     const [briefingVisible, setBriefingVisible] = useState(false);
     const [selectedThread, setSelectedThread] = useState<RecentThread | null>(null);
     const [recentContext, setRecentContext] = useState<RecentThread[]>([]);
     const [loading, setLoading] = useState(true);
+
+    // Get user's first name or username
+    const userName = user?.full_name?.split(' ')[0] || user?.username || 'there';
+    const greeting = `${getGreeting()}, ${userName}`;
 
     useEffect(() => {
         fetchRecentContext();
@@ -195,14 +208,14 @@ export default function HomeScreen() {
                             <Text style={styles.dateText}>
                                 {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
                             </Text>
-                            <Text style={styles.greetingText}>{DAILY_BRIEFING.greeting}</Text>
+                            <Text style={styles.greetingText}>{greeting}</Text>
                         </View>
                         <TouchableOpacity
                             style={styles.avatarButton}
                             onPress={() => router.push('/profile')}
                         >
                             <View style={styles.avatar}>
-                                <Text style={styles.avatarText}>A</Text>
+                                <Text style={styles.avatarText}>{userName.charAt(0).toUpperCase()}</Text>
                             </View>
                         </TouchableOpacity>
                     </View>
