@@ -5,6 +5,7 @@ All SQLAlchemy models for the R.E.M.I backend.
 """
 
 from db.models.attachment import Attachment
+from db.models.audit import AuditLog
 from db.models.collection_job import CollectionJob, JobStatus, JobType
 from db.models.contact import Contact
 from db.models.embedding import Embedding
@@ -25,6 +26,7 @@ from db.models.thread import Thread
 from db.models.user import User
 
 __all__ = [
+    "AuditLog",
     "User",
     "PlatformConnection",
     "PlatformType",
