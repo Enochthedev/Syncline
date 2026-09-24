@@ -4,17 +4,17 @@ R.E.M.I Backend Setup Validation Script
 Checks that all infrastructure components are properly configured and accessible.
 """
 
-import sys
 import asyncio
+import sys
 from typing import Dict, List, Tuple
 
 
 class Colors:
-    GREEN = '\033[92m'
-    RED = '\033[91m'
-    YELLOW = '\033[93m'
-    BLUE = '\033[94m'
-    END = '\033[0m'
+    GREEN = "\033[92m"
+    RED = "\033[91m"
+    YELLOW = "\033[93m"
+    BLUE = "\033[94m"
+    END = "\033[0m"
 
 
 def print_header(text: str):
@@ -39,17 +39,18 @@ async def check_postgres() -> Tuple[bool, str]:
     """Check PostgreSQL connection."""
     try:
         import asyncpg
+
         # Try to connect to Docker PostgreSQL
         try:
             conn = await asyncpg.connect(
-                host='localhost',
+                host="localhost",
                 port=5432,
-                user='postgres',
-                password='password',
-                database='mesh_development',
-                timeout=5
+                user="postgres",
+                password="password",
+                database="mesh_development",
+                timeout=5,
             )
-            version = await conn.fetchval('SELECT version()')
+            version = await conn.fetchval("SELECT version()")
             await conn.close()
             return True, f"PostgreSQL connected: {version.split(',')[0]}"
         except asyncpg.InvalidPasswordError:
@@ -61,13 +62,24 @@ async def check_postgres() -> Tuple[bool, str]:
         except Exception as conn_error:
             # Check if Docker container is running
             import subprocess
+
             result = subprocess.run(
-                ['docker', 'ps', '--filter', 'name=remi_postgres', '--format', '{{.Status}}'],
+                [
+                    "docker",
+                    "ps",
+                    "--filter",
+                    "name=remi_postgres",
+                    "--format",
+                    "{{.Status}}",
+                ],
                 capture_output=True,
-                text=True
+                text=True,
             )
-            if 'Up' in result.stdout:
-                return True, "PostgreSQL container running (connection will work after setup)"
+            if "Up" in result.stdout:
+                return (
+                    True,
+                    "PostgreSQL container running (connection will work after setup)",
+                )
             else:
                 return False, f"PostgreSQL connection failed: {str(conn_error)}"
     except ImportError:
@@ -80,10 +92,11 @@ async def check_redis() -> Tuple[bool, str]:
     """Check Redis connection."""
     try:
         import redis.asyncio as redis
-        client = redis.Redis(host='localhost', port=6379, decode_responses=True)
+
+        client = redis.Redis(host="localhost", port=6379, decode_responses=True)
         await client.ping()
-        info = await client.info('server')
-        version = info.get('redis_version', 'unknown')
+        info = await client.info("server")
+        version = info.get("redis_version", "unknown")
         await client.close()
         return True, f"Redis connected: v{version}"
     except ImportError:
@@ -96,11 +109,14 @@ async def check_ollama() -> Tuple[bool, str]:
     """Check Ollama service."""
     try:
         import aiohttp
+
         async with aiohttp.ClientSession() as session:
-            async with session.get('http://localhost:11434/api/tags', timeout=5) as resp:
+            async with session.get(
+                "http://localhost:11434/api/tags", timeout=5
+            ) as resp:
                 if resp.status == 200:
                     data = await resp.json()
-                    models = data.get('models', [])
+                    models = data.get("models", [])
                     model_count = len(models)
                     return True, f"Ollama connected: {model_count} models available"
                 else:
@@ -117,13 +133,18 @@ async def check_chromadb() -> Tuple[bool, str]:
     """Check ChromaDB service."""
     try:
         import aiohttp
+
         async with aiohttp.ClientSession() as session:
             # Try v2 API first (newer versions)
-            async with session.get('http://localhost:8001/api/v2/heartbeat', timeout=5) as resp:
+            async with session.get(
+                "http://localhost:8001/api/v2/heartbeat", timeout=5
+            ) as resp:
                 if resp.status == 200:
                     return True, "ChromaDB connected and healthy (v2 API)"
                 # Fall back to v1 API
-                async with session.get('http://localhost:8001/api/v1/heartbeat', timeout=5) as resp_v1:
+                async with session.get(
+                    "http://localhost:8001/api/v1/heartbeat", timeout=5
+                ) as resp_v1:
                     if resp_v1.status == 200:
                         return True, "ChromaDB connected and healthy (v1 API)"
                     elif resp_v1.status == 410:
@@ -142,7 +163,8 @@ async def check_chromadb() -> Tuple[bool, str]:
 def check_env_file() -> Tuple[bool, str]:
     """Check if .env file exists."""
     import os
-    if os.path.exists('.env'):
+
+    if os.path.exists(".env"):
         return True, ".env file exists"
     else:
         return False, ".env file not found (copy from .env.example)"
@@ -151,9 +173,18 @@ def check_env_file() -> Tuple[bool, str]:
 def check_directories() -> Tuple[bool, str]:
     """Check if required directories exist."""
     import os
-    required_dirs = ['api', 'config', 'db', 'integrations', 'services', 'tests', 'utils']
+
+    required_dirs = [
+        "api",
+        "config",
+        "db",
+        "integrations",
+        "services",
+        "tests",
+        "utils",
+    ]
     missing = [d for d in required_dirs if not os.path.isdir(d)]
-    
+
     if not missing:
         return True, f"All required directories exist ({len(required_dirs)} dirs)"
     else:
@@ -166,20 +197,23 @@ def check_python_version() -> Tuple[bool, str]:
     if version.major == 3 and version.minor >= 11:
         return True, f"Python {version.major}.{version.minor}.{version.micro}"
     else:
-        return False, f"Python 3.11+ required, found {version.major}.{version.minor}.{version.micro}"
+        return (
+            False,
+            f"Python 3.11+ required, found {version.major}.{version.minor}.{version.micro}",
+        )
 
 
 def check_dependencies() -> Tuple[bool, str]:
     """Check if key dependencies are installed."""
-    required = ['fastapi', 'sqlalchemy', 'pydantic', 'redis', 'asyncpg']
+    required = ["fastapi", "sqlalchemy", "pydantic", "redis", "asyncpg"]
     missing = []
-    
+
     for package in required:
         try:
             __import__(package)
         except ImportError:
             missing.append(package)
-    
+
     if not missing:
         return True, f"All core dependencies installed ({len(required)} packages)"
     else:
@@ -189,7 +223,7 @@ def check_dependencies() -> Tuple[bool, str]:
 async def run_checks():
     """Run all validation checks."""
     print_header("R.E.M.I Backend Setup Validation")
-    
+
     checks = [
         ("Python Version", check_python_version, False),
         ("Dependencies", check_dependencies, False),
@@ -200,9 +234,9 @@ async def run_checks():
         ("ChromaDB", check_chromadb, True),
         ("Ollama", check_ollama, True),
     ]
-    
+
     results: List[Tuple[str, bool, str]] = []
-    
+
     for name, check_func, is_async in checks:
         print(f"Checking {name}...", end=" ", flush=True)
         try:
@@ -210,10 +244,10 @@ async def run_checks():
                 success, message = await check_func()
             else:
                 success, message = check_func()
-            
+
             results.append((name, success, message))
             print("\r" + " " * 50 + "\r", end="")  # Clear line
-            
+
             if success:
                 print_success(f"{name}: {message}")
             else:
@@ -222,13 +256,13 @@ async def run_checks():
             results.append((name, False, str(e)))
             print("\r" + " " * 50 + "\r", end="")
             print_error(f"{name}: Unexpected error - {str(e)}")
-    
+
     # Summary
     print_header("Validation Summary")
-    
+
     passed = sum(1 for _, success, _ in results if success)
     total = len(results)
-    
+
     if passed == total:
         print_success(f"All checks passed! ({passed}/{total})")
         print("\n✨ Your backend setup is ready to go!")

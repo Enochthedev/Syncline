@@ -4,9 +4,10 @@ API Routes Tests
 Basic tests for API endpoints.
 """
 
+from datetime import datetime
+
 import pytest
 from httpx import AsyncClient
-from datetime import datetime
 
 
 class TestHealthEndpoints:
@@ -74,8 +75,7 @@ class TestAIEndpoints:
     async def test_semantic_search(self, client: AsyncClient):
         """Test semantic search endpoint."""
         response = await client.post(
-            "/api/v1/ai/search",
-            json={"query": "test query", "limit": 10}
+            "/api/v1/ai/search", json={"query": "test query", "limit": 10}
         )
         # May return 500 if services not initialized, which is OK for basic test
         assert response.status_code in [200, 500]

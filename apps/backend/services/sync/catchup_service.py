@@ -14,12 +14,12 @@ from datetime import datetime, timedelta
 from typing import Optional
 from uuid import UUID
 
-from sqlalchemy import select, func, and_
+from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from db.models.platform_connection import PlatformConnection
 from db.models.collection_job import CollectionJob, CollectionJobStatus
 from db.models.message import Message
+from db.models.platform_connection import PlatformConnection
 from services.collection_orchestrator import get_collection_orchestrator
 
 logger = logging.getLogger(__name__)
@@ -61,23 +61,30 @@ class CatchUpSyncService:
             start_date = datetime.utcnow() - timedelta(days=lookback_days)
 
             # Get all messages for this connection, ordered by timestamp
-            query = select(Message).where(
-                and_(
-                    Message.connection_id == connection_id,
-                    Message.timestamp >= start_date
+            query = (
+                select(Message)
+                .where(
+                    and_(
+                        Message.connection_id == connection_id,
+                        Message.timestamp >= start_date,
+                    )
                 )
-            ).order_by(Message.timestamp)
+                .order_by(Message.timestamp)
+            )
 
             result = await db.execute(query)
             messages = result.scalars().all()
 
             if not messages:
                 # No messages yet, entire period is a gap
-                return [{
-                    "start_date": start_date,
-                    "end_date": datetime.utcnow(),
-                    "gap_hours": (datetime.utcnow() - start_date).total_seconds() / 3600,
-                }]
+                return [
+                    {
+                        "start_date": start_date,
+                        "end_date": datetime.utcnow(),
+                        "gap_hours": (datetime.utcnow() - start_date).total_seconds()
+                        / 3600,
+                    }
+                ]
 
             # Detect gaps (periods > 1 hour without messages)
             gaps = []
@@ -89,11 +96,13 @@ class CatchUpSyncService:
                 gap_duration = next_msg - current
 
                 if gap_duration > threshold:
-                    gaps.append({
-                        "start_date": current,
-                        "end_date": next_msg,
-                        "gap_hours": gap_duration.total_seconds() / 3600,
-                    })
+                    gaps.append(
+                        {
+                            "start_date": current,
+                            "end_date": next_msg,
+                            "gap_hours": gap_duration.total_seconds() / 3600,
+                        }
+                    )
 
             # Check gap from last message to now
             if messages:
@@ -102,11 +111,13 @@ class CatchUpSyncService:
                 gap_since_last = now - last_message
 
                 if gap_since_last > threshold:
-                    gaps.append({
-                        "start_date": last_message,
-                        "end_date": now,
-                        "gap_hours": gap_since_last.total_seconds() / 3600,
-                    })
+                    gaps.append(
+                        {
+                            "start_date": last_message,
+                            "end_date": now,
+                            "gap_hours": gap_since_last.total_seconds() / 3600,
+                        }
+                    )
 
             logger.info(f"Detected {len(gaps)} gaps for connection {connection_id}")
             return gaps

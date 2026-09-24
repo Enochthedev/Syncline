@@ -4,8 +4,8 @@ Message Model
 Normalized messages in unified schema across all platforms.
 """
 
-from sqlalchemy import Column, String, ForeignKey, DateTime, Text, UniqueConstraint
-from sqlalchemy.dialects.postgresql import UUID, JSONB
+from sqlalchemy import Column, DateTime, ForeignKey, String, Text, UniqueConstraint
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import relationship
 
 from db.base import Base
@@ -14,10 +14,10 @@ from db.base import Base
 class Message(Base):
     """
     Normalized message model with unified schema.
-    
+
     Represents messages from all platforms in a consistent format
     after cleaning and normalization.
-    
+
     Attributes:
         connection_id: Foreign key to PlatformConnection
         raw_message_id: Foreign key to RawMessage
@@ -37,40 +37,40 @@ class Message(Base):
         entities: Related extracted entities
         embeddings: Related embeddings
     """
-    
+
     __tablename__ = "messages"
-    
+
     # Foreign keys
     connection_id = Column(
         UUID(as_uuid=True),
         ForeignKey("platform_connections.id", ondelete="CASCADE"),
         nullable=False,
-        index=True
+        index=True,
     )
-    
+
     raw_message_id = Column(
         UUID(as_uuid=True),
         ForeignKey("raw_messages.id", ondelete="CASCADE"),
         nullable=False,
         unique=True,
-        index=True
+        index=True,
     )
-    
+
     # Platform information (denormalized)
     platform = Column(String(50), nullable=False, index=True)
     platform_message_id = Column(String(255), nullable=False, index=True)
-    
+
     # Thread/conversation identifier
     thread_id = Column(String(255), nullable=True, index=True)
-    
+
     # Sender (linked to Participant model)
     sender_id = Column(
         UUID(as_uuid=True),
         ForeignKey("participants.id", ondelete="SET NULL"),
         nullable=True,
-        index=True
+        index=True,
     )
-    
+
     # Message content
     # Structure: {
     #   "text": "plain text content",
@@ -78,7 +78,7 @@ class Message(Base):
     #   "format": "plain|html|markdown"
     # }
     content = Column(JSONB, nullable=False)
-    
+
     # Additional metadata
     # Structure: {
     #   "platform_specific": {...},
@@ -88,45 +88,39 @@ class Message(Base):
     #   "recipients": [...]
     # }
     message_metadata = Column(JSONB, nullable=True)
-    
+
     # Timestamps
     timestamp = Column(DateTime, nullable=False, index=True)
     collected_at = Column(DateTime, nullable=False)
     cleaned_at = Column(DateTime, nullable=False)
-    
+
     # Relationships
     connection = relationship("PlatformConnection")
     raw_message = relationship("RawMessage", back_populates="message")
     sender = relationship(
-        "Participant",
-        foreign_keys=[sender_id],
-        back_populates="sent_messages"
+        "Participant", foreign_keys=[sender_id], back_populates="sent_messages"
     )
     attachments = relationship(
-        "Attachment",
-        back_populates="message",
-        cascade="all, delete-orphan"
+        "Attachment", back_populates="message", cascade="all, delete-orphan"
     )
     entities = relationship(
-        "Entity",
-        back_populates="message",
-        cascade="all, delete-orphan"
+        "Entity", back_populates="message", cascade="all, delete-orphan"
     )
     embeddings = relationship(
         "Embedding",
         back_populates="message",
         cascade="all, delete-orphan",
-        uselist=False
+        uselist=False,
     )
-    
+
     # Unique constraint: one normalized message per raw message
     __table_args__ = (
         UniqueConstraint(
             "connection_id",
             "platform_message_id",
-            name="uq_connection_normalized_message"
+            name="uq_connection_normalized_message",
         ),
     )
-    
+
     def __repr__(self) -> str:
         return f"<Message(id={self.id}, platform={self.platform}, timestamp={self.timestamp})>"

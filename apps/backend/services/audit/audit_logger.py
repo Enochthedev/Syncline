@@ -10,22 +10,20 @@ Tracks data access and modifications for compliance:
 """
 
 import logging
-from datetime import datetime
 from enum import Enum
-from typing import Optional, Any
+from typing import Any, Optional
 from uuid import UUID
 
-from sqlalchemy import Column, String, DateTime, Integer, Text, Index
-from sqlalchemy.dialects.postgresql import UUID as PGUUID, JSONB
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from db.base import Base
+from db.models.audit import AuditLog
 
 logger = logging.getLogger(__name__)
 
 
 class AuditAction(str, Enum):
     """Audit action types."""
+
     # Authentication
     LOGIN = "login"
     LOGOUT = "logout"
@@ -44,53 +42,6 @@ class AuditAction(str, Enum):
     SYSTEM_START = "system_start"
     SYSTEM_STOP = "system_stop"
     ERROR = "error"
-
-
-class AuditLog(Base):
-    """
-    Audit log entry model.
-
-    Tracks all significant actions in the system for compliance and debugging.
-    """
-
-    __tablename__ = "audit_logs"
-
-    # User information
-    user_id = Column(PGUUID(as_uuid=True), nullable=True, index=True)
-    username = Column(String(100), nullable=True)
-
-    # Action details
-    action = Column(String(50), nullable=False, index=True)
-    resource_type = Column(String(100), nullable=True, index=True)
-    resource_id = Column(String(255), nullable=True)
-
-    # Request context
-    ip_address = Column(String(45), nullable=True)
-    user_agent = Column(Text, nullable=True)
-    endpoint = Column(String(500), nullable=True)
-    method = Column(String(10), nullable=True)
-
-    # Status
-    status_code = Column(Integer, nullable=True)
-    success = Column(Boolean, default=True)
-
-    # Details
-    details = Column(JSONB, nullable=True)
-    error_message = Column(Text, nullable=True)
-
-    # Correlation
-    correlation_id = Column(String(100), nullable=True, index=True)
-    request_id = Column(String(100), nullable=True)
-
-    # Timestamp
-    timestamp = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
-
-    # Indexes for common queries
-    __table_args__ = (
-        Index('ix_audit_logs_user_timestamp', 'user_id', 'timestamp'),
-        Index('ix_audit_logs_action_timestamp', 'action', 'timestamp'),
-        Index('ix_audit_logs_resource', 'resource_type', 'resource_id'),
-    )
 
 
 class AuditLogger:
@@ -176,7 +127,7 @@ class AuditLogger:
         resource_type: str,
         resource_id: str,
         action: AuditAction = AuditAction.READ,
-        **kwargs
+        **kwargs,
     ) -> AuditLog:
         """
         Log data access event.
@@ -200,7 +151,7 @@ class AuditLogger:
             username=username,
             resource_type=resource_type,
             resource_id=resource_id,
-            **kwargs
+            **kwargs,
         )
 
 

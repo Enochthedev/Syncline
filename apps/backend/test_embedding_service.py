@@ -24,12 +24,13 @@ def test_imports():
             get_embedding_service,
         )
         from services.ai.semantic_search import (
-            SemanticSearchEngine,
             SearchFilter,
-            SearchResultItem,
             SearchResponse,
+            SearchResultItem,
+            SemanticSearchEngine,
             get_semantic_search_engine,
         )
+
         print("  ✓ All imports successful")
         return True
     except Exception as e:
@@ -42,7 +43,7 @@ def test_embedding_service_structure():
     print("Testing EmbeddingService structure...")
     try:
         from services.ai.embeddings import EmbeddingService
-        
+
         # Check required methods exist
         required_methods = [
             "generate_embedding",
@@ -54,10 +55,10 @@ def test_embedding_service_structure():
             "process_unembedded_messages",
             "health_check",
         ]
-        
+
         for method in required_methods:
             assert hasattr(EmbeddingService, method), f"Missing method: {method}"
-        
+
         print("  ✓ EmbeddingService has all required methods")
         return True
     except Exception as e:
@@ -70,7 +71,7 @@ def test_semantic_search_structure():
     print("Testing SemanticSearchEngine structure...")
     try:
         from services.ai.semantic_search import SemanticSearchEngine
-        
+
         # Check required methods exist
         required_methods = [
             "search",
@@ -78,10 +79,10 @@ def test_semantic_search_structure():
             "search_by_thread",
             "search_by_platform",
         ]
-        
+
         for method in required_methods:
             assert hasattr(SemanticSearchEngine, method), f"Missing method: {method}"
-        
+
         print("  ✓ SemanticSearchEngine has all required methods")
         return True
     except Exception as e:
@@ -95,18 +96,18 @@ def test_pydantic_models():
     try:
         from services.ai.semantic_search import (
             SearchFilter,
-            SearchResultItem,
             SearchResponse,
+            SearchResultItem,
         )
-        
+
         # Test SearchFilter
         filter_obj = SearchFilter(platforms=["gmail", "slack"])
         assert filter_obj.platforms == ["gmail", "slack"]
-        
+
         # Test SearchResultItem
-        from uuid import uuid4
         from datetime import datetime
-        
+        from uuid import uuid4
+
         result_item = SearchResultItem(
             message_id=uuid4(),
             platform="gmail",
@@ -115,7 +116,7 @@ def test_pydantic_models():
             similarity_score=0.95,
         )
         assert result_item.similarity_score == 0.95
-        
+
         # Test SearchResponse
         response = SearchResponse(
             query="test query",
@@ -124,7 +125,7 @@ def test_pydantic_models():
             search_time_ms=10.5,
         )
         assert response.query == "test query"
-        
+
         print("  ✓ All Pydantic models work correctly")
         return True
     except Exception as e:
@@ -138,17 +139,17 @@ def test_factory_functions():
     try:
         from services.ai.embeddings import get_embedding_service
         from services.ai.semantic_search import get_semantic_search_engine
-        
+
         # Test embedding service factory
         service1 = get_embedding_service()
         service2 = get_embedding_service()
         assert service1 is service2, "Factory should return singleton"
-        
+
         # Test search engine factory
         engine1 = get_semantic_search_engine()
         engine2 = get_semantic_search_engine()
         assert engine1 is engine2, "Factory should return singleton"
-        
+
         print("  ✓ Factory functions work correctly")
         return True
     except Exception as e:
@@ -162,15 +163,15 @@ def test_service_initialization():
     try:
         from services.ai.embeddings import EmbeddingService
         from services.ai.semantic_search import SemanticSearchEngine
-        
+
         # Test EmbeddingService initialization
         embedding_service = EmbeddingService(batch_size=5)
         assert embedding_service.batch_size == 5
-        
+
         # Test SemanticSearchEngine initialization
         search_engine = SemanticSearchEngine(default_limit=20)
         assert search_engine.default_limit == 20
-        
+
         print("  ✓ Services can be initialized with custom parameters")
         return True
     except Exception as e:
@@ -185,19 +186,19 @@ def test_integration_with_dependencies():
         from services.ai.embeddings import EmbeddingService
         from services.ai.providers import get_llm_provider
         from services.vector_db.chroma_client import get_chroma_client
-        
+
         # Test that EmbeddingService can use existing services
         llm_provider = get_llm_provider()
         chroma_client = get_chroma_client()
-        
+
         service = EmbeddingService(
             llm_provider=llm_provider,
             chroma_client=chroma_client,
         )
-        
+
         assert service.llm_provider is not None
         assert service.chroma_client is not None
-        
+
         print("  ✓ Services integrate correctly with dependencies")
         return True
     except Exception as e:
@@ -210,7 +211,7 @@ def main():
     print("=" * 60)
     print("Embedding Service Test Suite")
     print("=" * 60)
-    
+
     tests = [
         test_imports,
         test_embedding_service_structure,
@@ -220,12 +221,12 @@ def main():
         test_service_initialization,
         test_integration_with_dependencies,
     ]
-    
+
     results = [test() for test in tests]
-    
+
     print("\n" + "=" * 60)
     print(f"Passed: {sum(results)}/{len(results)}")
-    
+
     if sum(results) == len(results):
         print("\n✓ All tests passed!")
         return 0

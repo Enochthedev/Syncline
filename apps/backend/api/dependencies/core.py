@@ -17,18 +17,18 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from config.config import Settings, settings
 from db.session import get_db
 
-
 # =============================================================================
 # Database Dependencies
 # =============================================================================
 
+
 async def get_database_session() -> AsyncGenerator[AsyncSession, None]:
     """
     Dependency for database session.
-    
+
     Yields:
         AsyncSession: Database session
-        
+
     Example:
         @app.get("/users")
         async def get_users(db: AsyncSession = Depends(get_database_session)):
@@ -43,13 +43,14 @@ async def get_database_session() -> AsyncGenerator[AsyncSession, None]:
 # Configuration Dependencies
 # =============================================================================
 
+
 def get_settings() -> Settings:
     """
     Dependency for application settings.
-    
+
     Returns:
         Settings: Application configuration
-        
+
     Example:
         @app.get("/config")
         async def get_config(config: Settings = Depends(get_settings)):
@@ -65,7 +66,7 @@ def get_settings() -> Settings:
 # async def get_redis_client() -> AsyncGenerator[Redis, None]:
 #     """
 #     Dependency for Redis client.
-#     
+#
 #     Yields:
 #         Redis: Redis client instance
 #     """
@@ -80,7 +81,7 @@ def get_settings() -> Settings:
 # async def get_event_bus() -> EventBus:
 #     """
 #     Dependency for event bus.
-#     
+#
 #     Returns:
 #         EventBus: Event bus instance
 #     """
@@ -98,14 +99,14 @@ def get_settings() -> Settings:
 # ) -> User:
 #     """
 #     Dependency for current authenticated user.
-#     
+#
 #     Args:
 #         token: JWT token from request
 #         db: Database session
-#         
+#
 #     Returns:
 #         User: Current authenticated user
-#         
+#
 #     Raises:
 #         HTTPException: If authentication fails
 #     """
@@ -118,13 +119,13 @@ def get_settings() -> Settings:
 # ) -> User:
 #     """
 #     Dependency that requires admin role.
-#     
+#
 #     Args:
 #         current_user: Current authenticated user
-#         
+#
 #     Returns:
 #         User: Current user if admin
-#         
+#
 #     Raises:
 #         HTTPException: If user is not admin
 #     """
@@ -141,10 +142,10 @@ def get_settings() -> Settings:
 # ) -> CollectionService:
 #     """
 #     Dependency for collection service.
-#     
+#
 #     Args:
 #         db: Database session
-#         
+#
 #     Returns:
 #         CollectionService: Collection service instance
 #     """
@@ -157,10 +158,10 @@ def get_settings() -> Settings:
 # ) -> AIService:
 #     """
 #     Dependency for AI service.
-#     
+#
 #     Args:
 #         db: Database session
-#         
+#
 #     Returns:
 #         AIService: AI service instance
 #     """
@@ -172,15 +173,16 @@ def get_settings() -> Settings:
 # Pagination Dependencies
 # =============================================================================
 
+
 class PaginationParams:
     """
     Pagination parameters for list endpoints.
-    
+
     Attributes:
         skip: Number of records to skip
         limit: Maximum number of records to return
     """
-    
+
     def __init__(
         self,
         skip: int = 0,
@@ -188,7 +190,7 @@ class PaginationParams:
     ):
         """
         Initialize pagination parameters.
-        
+
         Args:
             skip: Number of records to skip (default: 0)
             limit: Maximum number of records to return (default: 100, max: 1000)
@@ -203,14 +205,14 @@ def get_pagination_params(
 ) -> PaginationParams:
     """
     Dependency for pagination parameters.
-    
+
     Args:
         skip: Number of records to skip
         limit: Maximum number of records to return
-        
+
     Returns:
         PaginationParams: Pagination parameters
-        
+
     Example:
         @app.get("/items")
         async def list_items(
@@ -225,28 +227,29 @@ def get_pagination_params(
 # Validation Dependencies
 # =============================================================================
 
+
 def validate_uuid(uuid_str: str) -> str:
     """
     Validate UUID format.
-    
+
     Args:
         uuid_str: UUID string to validate
-        
+
     Returns:
         str: Validated UUID string
-        
+
     Raises:
         HTTPException: If UUID is invalid
     """
     import uuid
-    
+
     try:
         uuid.UUID(uuid_str)
         return uuid_str
     except ValueError:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid UUID format: {uuid_str}"
+            detail=f"Invalid UUID format: {uuid_str}",
         )
 
 

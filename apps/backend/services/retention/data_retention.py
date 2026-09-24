@@ -12,13 +12,13 @@ import logging
 from datetime import datetime, timedelta
 from typing import Optional
 
-from sqlalchemy import select, delete, and_
+from sqlalchemy import and_, delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from config.config import settings
+from db.models.audit import AuditLog
 from db.models.message import Message
 from db.models.raw_message import RawMessage
-from db.models.audit import AuditLog
-from config.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -55,7 +55,9 @@ class DataRetentionService:
             policy: Retention policy (uses defaults if not provided)
         """
         self.policy = policy or RetentionPolicy()
-        logger.info(f"Initialized DataRetentionService with policy: {self.policy.__dict__}")
+        logger.info(
+            f"Initialized DataRetentionService with policy: {self.policy.__dict__}"
+        )
 
     async def cleanup_old_messages(self, db: AsyncSession) -> int:
         """

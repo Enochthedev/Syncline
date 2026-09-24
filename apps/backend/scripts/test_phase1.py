@@ -16,9 +16,9 @@ from uuid import uuid4
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from services.encryption_service import get_encryption_service
-from services.connector_cache import get_connector_cache
 from config.config import settings
+from services.connector_cache import get_connector_cache
+from services.encryption_service import get_encryption_service
 
 
 def test_encryption_service():
@@ -34,7 +34,7 @@ def test_encryption_service():
         "access_token": "super_secret_token_123",
         "refresh_token": "refresh_token_456",
         "expires_at": "2025-12-31T23:59:59Z",
-        "api_key": "sk-1234567890abcdef"
+        "api_key": "sk-1234567890abcdef",
     }
 
     print("\n[1] Original credentials:")
@@ -79,8 +79,13 @@ async def test_credential_rotation():
     print("TEST 2: Credential Rotation")
     print("=" * 80)
 
-    from db.models.platform_connection import PlatformConnection, PlatformType, ConnectionStatus
     from datetime import datetime, timedelta, timezone
+
+    from db.models.platform_connection import (
+        ConnectionStatus,
+        PlatformConnection,
+        PlatformType,
+    )
 
     # Test rotation logic without database
     print("\n[1] Creating mock connection object...")
@@ -94,7 +99,9 @@ async def test_credential_rotation():
     test_conn._credentials_legacy = None
     test_conn.credentials_version = "v1"
     test_conn.credentials_rotated_at = None
-    test_conn.created_at = datetime.now(timezone.utc) - timedelta(days=100)  # Old connection
+    test_conn.created_at = datetime.now(timezone.utc) - timedelta(
+        days=100
+    )  # Old connection
 
     print(f"  ✓ Mock connection created")
     print(f"  Initial version: {test_conn.credentials_version}")
@@ -104,13 +111,17 @@ async def test_credential_rotation():
     print("\n[2] Setting initial credentials...")
     test_conn.credentials = {
         "access_token": "initial_token_123",
-        "refresh_token": "initial_refresh_456"
+        "refresh_token": "initial_refresh_456",
     }
 
     # Verify encryption happened
     assert test_conn._credentials_encrypted is not None, "❌ Credentials not encrypted!"
-    assert test_conn._credentials_legacy is None, "❌ Legacy credentials should be None!"
-    print(f"  ✓ Credentials encrypted (length: {len(test_conn._credentials_encrypted)} bytes)")
+    assert (
+        test_conn._credentials_legacy is None
+    ), "❌ Legacy credentials should be None!"
+    print(
+        f"  ✓ Credentials encrypted (length: {len(test_conn._credentials_encrypted)} bytes)"
+    )
 
     # Verify decryption works
     creds = test_conn.credentials
@@ -119,17 +130,18 @@ async def test_credential_rotation():
 
     # Test rotation
     print("\n[3] Rotating credentials...")
-    test_conn.rotate_credentials({
-        "access_token": "new_token_789",
-        "refresh_token": "new_refresh_xyz"
-    })
+    test_conn.rotate_credentials(
+        {"access_token": "new_token_789", "refresh_token": "new_refresh_xyz"}
+    )
 
     print(f"  ✓ Credentials rotated")
     print(f"  New version: {test_conn.credentials_version}")
     print(f"  Rotated at: {test_conn.credentials_rotated_at}")
 
     assert test_conn.credentials_version == "v2", "❌ Version not incremented!"
-    assert test_conn.credentials_rotated_at is not None, "❌ Rotation timestamp not set!"
+    assert (
+        test_conn.credentials_rotated_at is not None
+    ), "❌ Rotation timestamp not set!"
 
     # Verify new decrypted credentials
     creds = test_conn.credentials
@@ -252,6 +264,7 @@ async def run_all_tests():
     except Exception as e:
         print(f"\n❌ Credential Rotation: FAILED - {e}")
         import traceback
+
         traceback.print_exc()
         results["rotation"] = False
 

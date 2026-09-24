@@ -21,9 +21,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.dependencies import get_database_session
 from api.dependencies.auth import (
-    get_current_user,
     get_current_active_user,
     get_current_admin_user,
+    get_current_user,
 )
 from db.models.user import User
 from services.auth.jwt_service import get_jwt_service
@@ -92,7 +92,9 @@ class PasswordChangeRequest(BaseModel):
     """Password change request."""
 
     current_password: str = Field(..., description="Current password")
-    new_password: str = Field(..., min_length=8, description="New password (min 8 characters)")
+    new_password: str = Field(
+        ..., min_length=8, description="New password (min 8 characters)"
+    )
 
 
 class UserUpdateRequest(BaseModel):
@@ -112,7 +114,7 @@ class UserUpdateRequest(BaseModel):
     response_model=UserResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Register New User",
-    description="Register a new user account"
+    description="Register a new user account",
 )
 async def register_user(
     request: UserRegisterRequest,
@@ -136,8 +138,7 @@ async def register_user(
     email_result = await db.execute(email_query)
     if email_result.scalar_one_or_none():
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Email already registered"
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Email already registered"
         )
 
     # Check if username already exists
@@ -145,8 +146,7 @@ async def register_user(
     username_result = await db.execute(username_query)
     if username_result.scalar_one_or_none():
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Username already taken"
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Username already taken"
         )
 
     # Hash password
@@ -178,7 +178,7 @@ async def register_user(
     "/login",
     response_model=TokenResponse,
     summary="User Login",
-    description="Authenticate user and get access tokens"
+    description="Authenticate user and get access tokens",
 )
 async def login(
     request: UserLoginRequest,
@@ -223,8 +223,7 @@ async def login(
     # Check if user is active
     if not user.is_active:
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="User account is inactive"
+            status_code=status.HTTP_403_FORBIDDEN, detail="User account is inactive"
         )
 
     # Generate tokens
@@ -253,7 +252,7 @@ async def login(
     "/refresh",
     response_model=TokenResponse,
     summary="Refresh Access Token",
-    description="Get a new access token using a refresh token"
+    description="Get a new access token using a refresh token",
 )
 async def refresh_token(
     request: RefreshTokenRequest,
@@ -330,7 +329,7 @@ async def refresh_token(
     "/me",
     response_model=UserResponse,
     summary="Get Current User",
-    description="Get current authenticated user's profile"
+    description="Get current authenticated user's profile",
 )
 async def get_current_user_profile(
     current_user: User = Depends(get_current_active_user),
@@ -351,7 +350,7 @@ async def get_current_user_profile(
     "/me",
     response_model=UserResponse,
     summary="Update Current User",
-    description="Update current user's profile"
+    description="Update current user's profile",
 )
 async def update_current_user(
     request: UserUpdateRequest,
@@ -383,7 +382,7 @@ async def update_current_user(
         if email_result.scalar_one_or_none():
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Email already registered"
+                detail="Email already registered",
             )
         current_user.email = request.email
 
@@ -399,7 +398,7 @@ async def update_current_user(
     "/me/change-password",
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Change Password",
-    description="Change current user's password"
+    description="Change current user's password",
 )
 async def change_password(
     request: PasswordChangeRequest,
@@ -421,12 +420,10 @@ async def change_password(
 
     # Verify current password
     if not jwt_service.verify_password(
-        request.current_password,
-        current_user.hashed_password
+        request.current_password, current_user.hashed_password
     ):
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Incorrect current password"
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Incorrect current password"
         )
 
     # Hash new password
@@ -446,7 +443,7 @@ async def change_password(
     "/users",
     response_model=list[UserResponse],
     summary="List Users (Admin Only)",
-    description="Get list of all users (admin only)"
+    description="Get list of all users (admin only)",
 )
 async def list_users(
     skip: int = 0,
@@ -477,7 +474,7 @@ async def list_users(
     "/users/{user_id}",
     response_model=UserResponse,
     summary="Get User (Admin Only)",
-    description="Get user by ID (admin only)"
+    description="Get user by ID (admin only)",
 )
 async def get_user(
     user_id: UUID,
@@ -502,8 +499,7 @@ async def get_user(
 
     if not user:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found"
+            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
         )
 
     return UserResponse.model_validate(user)

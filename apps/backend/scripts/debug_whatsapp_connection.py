@@ -12,10 +12,11 @@ from pathlib import Path
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+from uuid import uuid4
+
 from config.config import settings
 from integrations.whatsapp_connector import WhatsAppConnector
 from integrations.whatsapp_connector_enhanced import EnhancedWhatsAppConnector
-from uuid import uuid4
 
 print("=" * 80)
 print("WhatsApp Connection Diagnostics")
@@ -37,7 +38,9 @@ if not settings.MATRIX_ACCESS_TOKEN:
     print("❌ MATRIX_ACCESS_TOKEN is not set")
     config_issues.append("MATRIX_ACCESS_TOKEN")
 else:
-    print(f"✓ MATRIX_ACCESS_TOKEN: {'*' * 20} (length: {len(settings.MATRIX_ACCESS_TOKEN)})")
+    print(
+        f"✓ MATRIX_ACCESS_TOKEN: {'*' * 20} (length: {len(settings.MATRIX_ACCESS_TOKEN)})"
+    )
 
 if not settings.MATRIX_USER_ID:
     print("❌ MATRIX_USER_ID is not set")
@@ -75,8 +78,7 @@ async def test_connection():
 
     # Use enhanced connector for better error messages
     connector = EnhancedWhatsAppConnector(
-        connection_id=uuid4(),
-        credentials=credentials
+        connection_id=uuid4(), credentials=credentials
     )
 
     try:

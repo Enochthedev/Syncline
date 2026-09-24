@@ -8,12 +8,12 @@ Provides structured JSON logging with:
 - Multiple handlers (console, file, etc.)
 """
 
+import json
 import logging
 import logging.config
 import sys
 from datetime import datetime
 from typing import Any
-import json
 
 from config.config import settings
 
@@ -69,12 +69,32 @@ class StructuredFormatter(logging.Formatter):
         # Add extra fields
         for key, value in record.__dict__.items():
             if key not in [
-                "name", "msg", "args", "created", "filename", "funcName",
-                "levelname", "levelno", "lineno", "module", "msecs",
-                "message", "pathname", "process", "processName",
-                "relativeCreated", "thread", "threadName", "exc_info",
-                "exc_text", "stack_info", "correlation_id", "request_id",
-                "user_id", "endpoint", "method"
+                "name",
+                "msg",
+                "args",
+                "created",
+                "filename",
+                "funcName",
+                "levelname",
+                "levelno",
+                "lineno",
+                "module",
+                "msecs",
+                "message",
+                "pathname",
+                "process",
+                "processName",
+                "relativeCreated",
+                "thread",
+                "threadName",
+                "exc_info",
+                "exc_text",
+                "stack_info",
+                "correlation_id",
+                "request_id",
+                "user_id",
+                "endpoint",
+                "method",
             ]:
                 try:
                     # Only include JSON-serializable values
@@ -94,11 +114,11 @@ class ConsoleFormatter(logging.Formatter):
     """
 
     COLORS = {
-        "DEBUG": "\033[36m",      # Cyan
-        "INFO": "\033[32m",       # Green
-        "WARNING": "\033[33m",    # Yellow
-        "ERROR": "\033[31m",      # Red
-        "CRITICAL": "\033[35m",   # Magenta
+        "DEBUG": "\033[36m",  # Cyan
+        "INFO": "\033[32m",  # Green
+        "WARNING": "\033[33m",  # Yellow
+        "ERROR": "\033[31m",  # Red
+        "CRITICAL": "\033[35m",  # Magenta
     }
     RESET = "\033[0m"
 
@@ -203,9 +223,7 @@ class LoggerAdapter(logging.LoggerAdapter):
 
 
 def get_logger(
-    name: str,
-    correlation_id: str | None = None,
-    **extra_fields: Any
+    name: str, correlation_id: str | None = None, **extra_fields: Any
 ) -> logging.Logger | LoggerAdapter:
     """
     Get a logger with optional correlation ID and extra fields.

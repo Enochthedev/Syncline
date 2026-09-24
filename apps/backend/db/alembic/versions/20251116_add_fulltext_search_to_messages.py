@@ -5,13 +5,14 @@ Revises: cd551087417f
 Create Date: 2025-11-16 19:58:00.000000
 
 """
-from alembic import op
+
 import sqlalchemy as sa
+from alembic import op
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision = '2a3b4c5d6e7f'
-down_revision = 'cd551087417f'
+revision = "2a3b4c5d6e7f"
+down_revision = "cd551087417f"
 branch_labels = None
 depends_on = None
 
@@ -26,8 +27,7 @@ def upgrade() -> None:
     """
     # Add tsvector column for full-text search
     op.add_column(
-        'messages',
-        sa.Column('search_vector', postgresql.TSVECTOR, nullable=True)
+        "messages", sa.Column("search_vector", postgresql.TSVECTOR, nullable=True)
     )
 
     # Create function to update search vector
@@ -54,10 +54,10 @@ def upgrade() -> None:
 
     # Create GIN index for full-text search
     op.create_index(
-        'idx_messages_search_vector',
-        'messages',
-        ['search_vector'],
-        postgresql_using='gin'
+        "idx_messages_search_vector",
+        "messages",
+        ["search_vector"],
+        postgresql_using="gin",
     )
 
     # Update existing rows with search vectors
@@ -71,7 +71,7 @@ def upgrade() -> None:
     """)
 
     # Make search_vector NOT NULL after populating existing rows
-    op.alter_column('messages', 'search_vector', nullable=False)
+    op.alter_column("messages", "search_vector", nullable=False)
 
 
 def downgrade() -> None:
@@ -79,7 +79,7 @@ def downgrade() -> None:
     Remove full-text search support from messages table.
     """
     # Drop index
-    op.drop_index('idx_messages_search_vector', table_name='messages')
+    op.drop_index("idx_messages_search_vector", table_name="messages")
 
     # Drop trigger
     op.execute("DROP TRIGGER IF EXISTS messages_search_vector_trigger ON messages;")
@@ -88,4 +88,4 @@ def downgrade() -> None:
     op.execute("DROP FUNCTION IF EXISTS messages_search_vector_update();")
 
     # Drop column
-    op.drop_column('messages', 'search_vector')
+    op.drop_column("messages", "search_vector")

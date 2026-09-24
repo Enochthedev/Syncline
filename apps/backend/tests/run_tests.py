@@ -14,9 +14,9 @@ Usage:
 """
 
 import argparse
+import os
 import subprocess
 import sys
-import os
 from datetime import datetime
 from pathlib import Path
 
@@ -38,72 +38,68 @@ def run_pytest(test_path: str, report_name: str, extra_args: list = None) -> int
     results_dir = create_results_dir()
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     html_report = results_dir / f"{report_name}_{timestamp}.html"
-    
+
     cmd = [
-        sys.executable, "-m", "pytest",
+        sys.executable,
+        "-m",
+        "pytest",
         test_path,
         f"--html={html_report}",
         "--self-contained-html",
         "-v",
         "-s",
     ]
-    
+
     if extra_args:
         cmd.extend(extra_args)
-    
+
     print(f"\n{'='*60}")
     print(f"Running: {' '.join(cmd)}")
     print(f"Report: {html_report}")
     print(f"{'='*60}\n")
-    
+
     result = subprocess.run(cmd, cwd=get_project_root())
-    
+
     return result.returncode
 
 
 def run_security_tests() -> int:
     """Run all security tests."""
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("🔒 SECURITY TESTS")
-    print("="*60)
-    
-    return run_pytest(
-        "security/",
-        "security_test_report"
-    )
+    print("=" * 60)
+
+    return run_pytest("security/", "security_test_report")
 
 
 def run_performance_tests() -> int:
     """Run performance benchmark tests."""
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("📊 PERFORMANCE TESTS")
-    print("="*60)
-    
+    print("=" * 60)
+
     return run_pytest(
         "performance/",
         "performance_test_report",
-        extra_args=["--ignore=performance/locustfile.py", "-m", "not slow"]
+        extra_args=["--ignore=performance/locustfile.py", "-m", "not slow"],
     )
 
 
 def run_stress_tests() -> int:
     """Run stress tests."""
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("💪 STRESS TESTS")
-    print("="*60)
-    
-    return run_pytest(
-        "performance/test_stress.py",
-        "stress_test_report"
-    )
+    print("=" * 60)
+
+    return run_pytest("performance/test_stress.py", "stress_test_report")
 
 
 def run_quick_tests() -> int:
     """Run quick smoke tests."""
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("⚡ QUICK SMOKE TESTS")
-    print("="*60)
-    
+    print("=" * 60)
+
     # Run a subset of critical tests
     quick_tests = [
         "security/test_authentication.py::TestAuthenticationSecurity::test_tc20_forged_oauth_token_rejected",
@@ -111,38 +107,43 @@ def run_quick_tests() -> int:
         "security/test_input_validation.py::TestInputValidationSecurity::test_tc25_sql_injection_in_search",
         "security/test_input_validation.py::TestInputValidationSecurity::test_tc26_xss_in_message_content",
     ]
-    
+
     results_dir = create_results_dir()
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     html_report = results_dir / f"quick_test_report_{timestamp}.html"
-    
+
     cmd = [
-        sys.executable, "-m", "pytest",
+        sys.executable,
+        "-m",
+        "pytest",
         *quick_tests,
         f"--html={html_report}",
         "--self-contained-html",
         "-v",
     ]
-    
+
     result = subprocess.run(cmd, cwd=get_project_root())
     return result.returncode
 
 
 def run_load_test(users: int = 100, duration: str = "2m") -> int:
     """Run a short load test with Locust."""
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print(f"🚀 LOAD TEST ({users} users, {duration})")
-    print("="*60)
-    
+    print("=" * 60)
+
     results_dir = create_results_dir()
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     html_report = results_dir / f"load_test_report_{timestamp}.html"
-    
+
     host = os.getenv("TEST_URL", "http://localhost:8000")
-    
+
     cmd = [
-        sys.executable, "-m", "locust",
-        "-f", "performance/locustfile.py",
+        sys.executable,
+        "-m",
+        "locust",
+        "-f",
+        "performance/locustfile.py",
         f"--host={host}",
         "--headless",
         f"--users={users}",
@@ -150,10 +151,10 @@ def run_load_test(users: int = 100, duration: str = "2m") -> int:
         f"--run-time={duration}",
         f"--html={html_report}",
     ]
-    
+
     print(f"Command: {' '.join(cmd)}")
     print(f"Report: {html_report}\n")
-    
+
     result = subprocess.run(cmd, cwd=get_project_root())
     return result.returncode
 
@@ -161,31 +162,31 @@ def run_load_test(users: int = 100, duration: str = "2m") -> int:
 def run_all_tests() -> int:
     """Run all tests."""
     results = []
-    
-    print("\n" + "="*60)
+
+    print("\n" + "=" * 60)
     print("🧪 RUNNING COMPLETE TEST SUITE")
-    print("="*60)
-    
+    print("=" * 60)
+
     # Security tests
     results.append(("Security Tests", run_security_tests()))
-    
+
     # Performance benchmarks
     results.append(("Performance Benchmarks", run_performance_tests()))
-    
+
     # Print summary
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("📋 TEST SUMMARY")
-    print("="*60)
-    
+    print("=" * 60)
+
     all_passed = True
     for name, code in results:
         status = "✅ PASSED" if code == 0 else "❌ FAILED"
         print(f"  {name}: {status}")
         if code != 0:
             all_passed = False
-    
-    print("="*60)
-    
+
+    print("=" * 60)
+
     if all_passed:
         print("\n🎉 All tests passed!\n")
         return 0
@@ -224,23 +225,25 @@ Examples:
 def main():
     parser = argparse.ArgumentParser(
         description="MESH Test Suite Runner",
-        formatter_class=argparse.RawDescriptionHelpFormatter
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    
+
     parser.add_argument("--all", action="store_true", help="Run all tests")
     parser.add_argument("--security", action="store_true", help="Run security tests")
-    parser.add_argument("--performance", action="store_true", help="Run performance tests")
+    parser.add_argument(
+        "--performance", action="store_true", help="Run performance tests"
+    )
     parser.add_argument("--stress", action="store_true", help="Run stress tests")
     parser.add_argument("--load", action="store_true", help="Run load test")
     parser.add_argument("--quick", action="store_true", help="Run quick smoke tests")
     parser.add_argument("--users", type=int, default=100, help="Users for load test")
     parser.add_argument("--duration", default="2m", help="Duration for load test")
-    
+
     args = parser.parse_args()
-    
+
     # Change to tests directory
     os.chdir(get_project_root())
-    
+
     # Determine what to run
     if args.security:
         return run_security_tests()

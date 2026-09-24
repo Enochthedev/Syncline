@@ -5,19 +5,26 @@ Provides test fixtures and configuration for API testing,
 including performance and security test suites.
 """
 
-import os
-import pytest
 import asyncio
-from typing import AsyncGenerator
+import os
+from typing import AsyncGenerator, Optional
 
 import httpx
+import pytest
+import pytest_asyncio
 
-# Try to import app, but allow tests to run without it
+# Try to import app, but allow tests to run without it. Catch everything:
+# importing main pulls in settings validation and every router, so a failure
+# here is as likely to be a config error as a missing module — and swallowing
+# the reason is how these tests ended up silently talking to localhost:8000.
 try:
     from main import app
+
     APP_AVAILABLE = True
-except ImportError:
+    APP_IMPORT_ERROR: Optional[BaseException] = None
+except Exception as exc:  # noqa: BLE001 - reported below, not hidden
     APP_AVAILABLE = False
+    APP_IMPORT_ERROR = exc
     app = None
 
 
@@ -25,40 +32,49 @@ except ImportError:
 # PYTEST CONFIGURATION
 # ==============================================================================
 
+
 def pytest_configure(config):
     """Configure custom markers for test categorization."""
-    config.addinivalue_line(
-        "markers", "security: mark test as a security test"
-    )
-    config.addinivalue_line(
-        "markers", "performance: mark test as a performance test"
-    )
+    config.addinivalue_line("markers", "security: mark test as a security test")
+    config.addinivalue_line("markers", "performance: mark test as a performance test")
     config.addinivalue_line(
         "markers", "slow: mark test as slow (excluded from normal runs)"
     )
-    config.addinivalue_line(
-        "markers", "stress: mark test as a stress test"
-    )
-    config.addinivalue_line(
-        "markers", "benchmark: mark test as a benchmark"
-    )
+    config.addinivalue_line("markers", "stress: mark test as a stress test")
+    config.addinivalue_line("markers", "benchmark: mark test as a benchmark")
 
 
 def pytest_collection_modifyitems(config, items):
-    """Auto-mark tests based on their location."""
+    """Auto-mark tests based on their location, and skip what needs a server.
+
+    The security and performance suites talk to a running instance over HTTP
+    (``TEST_URL``, default http://localhost:8000). With nothing listening they
+    do not fail meaningfully — every one of them reports a connection error —
+    so they are skipped unless TEST_URL is set explicitly.
+    """
+    needs_server = os.getenv("TEST_URL") is None
+    skip_no_server = pytest.mark.skip(
+        reason="needs a running instance: set TEST_URL to the base URL"
+    )
+
     for item in items:
         # Auto-mark security tests
         if "security" in str(item.fspath):
             item.add_marker(pytest.mark.security)
-        
+            if needs_server:
+                item.add_marker(skip_no_server)
+
         # Auto-mark performance tests
         if "performance" in str(item.fspath):
             item.add_marker(pytest.mark.performance)
+            if needs_server:
+                item.add_marker(skip_no_server)
 
 
 # ==============================================================================
 # EVENT LOOP FIXTURE
 # ==============================================================================
+
 
 @pytest.fixture(scope="session")
 def event_loop():
@@ -72,11 +88,19 @@ def event_loop():
 # HTTP CLIENT FIXTURES
 # ==============================================================================
 
-@pytest.fixture
+
+@pytest_asyncio.fixture
 async def client() -> AsyncGenerator[httpx.AsyncClient, None]:
-    """Create async test client with app (for unit testing)."""
+    """Async client bound to the app in-process, or to TEST_URL if set.
+
+    This has to be a ``pytest_asyncio.fixture``: under pytest-asyncio's strict
+    mode a plain ``pytest.fixture`` hands the test the async generator itself,
+    which is why every test using it failed with "'async_generator' object has
+    no attribute 'get'".
+    """
     if APP_AVAILABLE and app:
-        async with httpx.AsyncClient(app=app, base_url="http://test") as ac:
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as ac:
             yield ac
     else:
         # Fall back to external client
@@ -108,6 +132,7 @@ def auth_headers(auth_token) -> dict:
 # TEST DATA FIXTURES
 # ==============================================================================
 
+
 @pytest.fixture
 def sample_message() -> dict:
     """Sample message for testing."""
@@ -116,7 +141,7 @@ def sample_message() -> dict:
         "content": "This is a test message for testing purposes.",
         "sender_id": "test_sender",
         "platform": "test",
-        "timestamp": "2026-01-05T00:00:00Z"
+        "timestamp": "2026-01-05T00:00:00Z",
     }
 
 
@@ -127,7 +152,7 @@ def sample_contact() -> dict:
         "id": "test_contact_001",
         "name": "Test Contact",
         "email": "test@example.com",
-        "phone": "+1234567890"
+        "phone": "+1234567890",
     }
 
 
@@ -160,6 +185,7 @@ def xss_payloads() -> list:
 # RESULTS DIRECTORY FIXTURE
 # ==============================================================================
 
+
 @pytest.fixture(scope="session")
 def results_dir(tmp_path_factory) -> str:
     """Create and return results directory for test outputs."""
@@ -173,11 +199,9 @@ def results_dir(tmp_path_factory) -> str:
 
 skip_if_no_server = pytest.mark.skipif(
     os.getenv("SKIP_LIVE_TESTS", "false").lower() == "true",
-    reason="Live server tests disabled"
+    reason="Live server tests disabled",
 )
 
 skip_if_no_auth = pytest.mark.skipif(
-    not os.getenv("TEST_AUTH_TOKEN"),
-    reason="No authentication token provided"
+    not os.getenv("TEST_AUTH_TOKEN"), reason="No authentication token provided"
 )
-

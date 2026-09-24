@@ -10,12 +10,12 @@ Comprehensive testing script to:
 """
 
 import asyncio
+import json
 import logging
 import sys
-from pathlib import Path
 from datetime import datetime
-from typing import Dict, Any, List
-import json
+from pathlib import Path
+from typing import Any, Dict, List
 
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -23,17 +23,16 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from db.session import get_session
-from db.models.platform_connection import PlatformConnection, PlatformType
+from config.config import settings
 from db.models.message import Message
+from db.models.platform_connection import PlatformConnection, PlatformType
+from db.session import get_session
 from integrations.whatsapp_connector import WhatsAppConnector
 from services.whatsapp_sync_enhanced import whatsapp_sync_enhanced
-from config.config import settings
 
 # Configure logging
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
@@ -44,24 +43,22 @@ class WhatsAppDiagnostics:
     def __init__(self):
         self.results: Dict[str, Any] = {
             "timestamp": datetime.utcnow().isoformat(),
-            "tests": []
+            "tests": [],
         }
 
     def add_test_result(
-        self,
-        test_name: str,
-        success: bool,
-        details: Any = None,
-        error: str = None
+        self, test_name: str, success: bool, details: Any = None, error: str = None
     ):
         """Add a test result."""
-        self.results["tests"].append({
-            "test": test_name,
-            "success": success,
-            "details": details,
-            "error": error,
-            "timestamp": datetime.utcnow().isoformat()
-        })
+        self.results["tests"].append(
+            {
+                "test": test_name,
+                "success": success,
+                "details": details,
+                "error": error,
+                "timestamp": datetime.utcnow().isoformat(),
+            }
+        )
 
     async def run_full_diagnostics(self, connection_id: str = None) -> Dict[str, Any]:
         """
@@ -93,7 +90,7 @@ class WhatsAppDiagnostics:
                     self.add_test_result(
                         "find_connections",
                         False,
-                        error="No WhatsApp connections found in database"
+                        error="No WhatsApp connections found in database",
                     )
                     return
 
@@ -130,7 +127,9 @@ class WhatsAppDiagnostics:
             logger.error("❌ MATRIX_ACCESS_TOKEN not configured")
             config_ok = False
         else:
-            logger.info(f"✓ Matrix access token configured (length: {len(settings.MATRIX_ACCESS_TOKEN)})")
+            logger.info(
+                f"✓ Matrix access token configured (length: {len(settings.MATRIX_ACCESS_TOKEN)})"
+            )
             details["access_token_length"] = len(settings.MATRIX_ACCESS_TOKEN)
 
         if not settings.MATRIX_USER_ID:
@@ -166,9 +165,7 @@ class WhatsAppDiagnostics:
             raise
 
     async def find_whatsapp_connections(
-        self,
-        db: AsyncSession,
-        connection_id: str = None
+        self, db: AsyncSession, connection_id: str = None
     ) -> List[PlatformConnection]:
         """Find WhatsApp connections."""
         logger.info("\n[TEST] Finding WhatsApp Connections")
@@ -204,7 +201,10 @@ class WhatsAppDiagnostics:
             self.add_test_result(
                 "find_connections",
                 True,
-                {"count": len(connections), "connection_ids": [str(c.id) for c in connections]}
+                {
+                    "count": len(connections),
+                    "connection_ids": [str(c.id) for c in connections],
+                },
             )
 
             return connections
@@ -247,7 +247,7 @@ class WhatsAppDiagnostics:
         try:
             connector = WhatsAppConnector(
                 connection_id=connection.id,
-                credentials=self._get_credentials(connection)
+                credentials=self._get_credentials(connection),
             )
 
             await connector.connect()
@@ -260,7 +260,7 @@ class WhatsAppDiagnostics:
             self.add_test_result(
                 f"bridge_connectivity_{connection.id}",
                 True,
-                {"user_id": whoami.get('user_id')}
+                {"user_id": whoami.get("user_id")},
             )
 
             await connector.disconnect()
@@ -268,9 +268,7 @@ class WhatsAppDiagnostics:
         except Exception as e:
             logger.error(f"❌ Bridge connectivity failed: {e}")
             self.add_test_result(
-                f"bridge_connectivity_{connection.id}",
-                False,
-                error=str(e)
+                f"bridge_connectivity_{connection.id}", False, error=str(e)
             )
 
     async def test_bridge_status(self, connection: PlatformConnection):
@@ -281,7 +279,7 @@ class WhatsAppDiagnostics:
         try:
             connector = WhatsAppConnector(
                 connection_id=connection.id,
-                credentials=self._get_credentials(connection)
+                credentials=self._get_credentials(connection),
             )
 
             await connector.connect()
@@ -302,21 +300,19 @@ class WhatsAppDiagnostics:
                 {
                     "connected": status.connected,
                     "logged_in": status.logged_in,
-                    "phone": status.phone
-                }
+                    "phone": status.phone,
+                },
             )
 
             await connector.disconnect()
 
         except Exception as e:
             logger.error(f"❌ Bridge status check failed: {e}")
-            self.add_test_result(
-                f"bridge_status_{connection.id}",
-                False,
-                error=str(e)
-            )
+            self.add_test_result(f"bridge_status_{connection.id}", False, error=str(e))
 
-    async def test_room_discovery(self, connection: PlatformConnection) -> List[Dict[str, Any]]:
+    async def test_room_discovery(
+        self, connection: PlatformConnection
+    ) -> List[Dict[str, Any]]:
         """Test room discovery."""
         logger.info("\n[TEST] Room Discovery")
         logger.info("-" * 80)
@@ -324,7 +320,7 @@ class WhatsAppDiagnostics:
         try:
             connector = WhatsAppConnector(
                 connection_id=connection.id,
-                credentials=self._get_credentials(connection)
+                credentials=self._get_credentials(connection),
             )
 
             await connector.connect()
@@ -343,7 +339,7 @@ class WhatsAppDiagnostics:
             self.add_test_result(
                 f"room_discovery_{connection.id}",
                 True,
-                {"room_count": len(rooms), "rooms": rooms[:5]}
+                {"room_count": len(rooms), "rooms": rooms[:5]},
             )
 
             await connector.disconnect()
@@ -351,17 +347,11 @@ class WhatsAppDiagnostics:
 
         except Exception as e:
             logger.error(f"❌ Room discovery failed: {e}")
-            self.add_test_result(
-                f"room_discovery_{connection.id}",
-                False,
-                error=str(e)
-            )
+            self.add_test_result(f"room_discovery_{connection.id}", False, error=str(e))
             return []
 
     async def test_message_fetching(
-        self,
-        connection: PlatformConnection,
-        room: Dict[str, Any]
+        self, connection: PlatformConnection, room: Dict[str, Any]
     ):
         """Test message fetching from a room."""
         logger.info("\n[TEST] Message Fetching")
@@ -370,7 +360,7 @@ class WhatsAppDiagnostics:
         try:
             connector = WhatsAppConnector(
                 connection_id=connection.id,
-                credentials=self._get_credentials(connection)
+                credentials=self._get_credentials(connection),
             )
 
             await connector.connect()
@@ -392,7 +382,7 @@ class WhatsAppDiagnostics:
             self.add_test_result(
                 f"message_fetching_{connection.id}",
                 True,
-                {"room_id": room_id, "message_count": len(messages)}
+                {"room_id": room_id, "message_count": len(messages)},
             )
 
             await connector.disconnect()
@@ -400,9 +390,7 @@ class WhatsAppDiagnostics:
         except Exception as e:
             logger.error(f"❌ Message fetching failed: {e}")
             self.add_test_result(
-                f"message_fetching_{connection.id}",
-                False,
-                error=str(e)
+                f"message_fetching_{connection.id}", False, error=str(e)
             )
 
     async def test_message_sync(self, db: AsyncSession, connection: PlatformConnection):
@@ -415,15 +403,15 @@ class WhatsAppDiagnostics:
 
             logger.info("Starting sync...")
             result = await sync_service.sync_messages_enhanced(
-                connection_id=connection.id,
-                limit=50,
-                force=False
+                connection_id=connection.id, limit=50, force=False
             )
 
             if result["success"]:
                 logger.info("✓ Message sync successful")
                 logger.info(f"  Total rooms: {result.get('total_rooms', 0)}")
-                logger.info(f"  Messages synced: {result.get('total_messages_synced', 0)}")
+                logger.info(
+                    f"  Messages synced: {result.get('total_messages_synced', 0)}"
+                )
 
                 stats = result.get("stats", {})
                 logger.info(f"  Sync attempts: {stats.get('sync_attempts', 0)}")
@@ -435,27 +423,23 @@ class WhatsAppDiagnostics:
                 f"message_sync_{connection.id}",
                 result["success"],
                 result if result["success"] else None,
-                result.get("error") if not result["success"] else None
+                result.get("error") if not result["success"] else None,
             )
 
         except Exception as e:
             logger.error(f"❌ Message sync failed: {e}")
-            self.add_test_result(
-                f"message_sync_{connection.id}",
-                False,
-                error=str(e)
-            )
+            self.add_test_result(f"message_sync_{connection.id}", False, error=str(e))
 
-    async def test_database_messages(self, db: AsyncSession, connection: PlatformConnection):
+    async def test_database_messages(
+        self, db: AsyncSession, connection: PlatformConnection
+    ):
         """Test database message count."""
         logger.info("\n[TEST] Database Messages")
         logger.info("-" * 80)
 
         try:
             result = await db.execute(
-                select(Message).where(
-                    Message.connection_id == connection.id
-                )
+                select(Message).where(Message.connection_id == connection.id)
             )
             messages = result.scalars().all()
 
@@ -472,15 +456,13 @@ class WhatsAppDiagnostics:
             self.add_test_result(
                 f"database_messages_{connection.id}",
                 True,
-                {"message_count": len(messages)}
+                {"message_count": len(messages)},
             )
 
         except Exception as e:
             logger.error(f"❌ Database message check failed: {e}")
             self.add_test_result(
-                f"database_messages_{connection.id}",
-                False,
-                error=str(e)
+                f"database_messages_{connection.id}", False, error=str(e)
             )
 
     def print_summary(self):
@@ -501,11 +483,15 @@ class WhatsAppDiagnostics:
             logger.info("\nFailed tests:")
             for test in self.results["tests"]:
                 if not test["success"]:
-                    logger.info(f"  ❌ {test['test']}: {test.get('error', 'Unknown error')}")
+                    logger.info(
+                        f"  ❌ {test['test']}: {test.get('error', 'Unknown error')}"
+                    )
 
         # Save to file
-        output_file = f"whatsapp_diagnostics_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.json"
-        with open(output_file, 'w') as f:
+        output_file = (
+            f"whatsapp_diagnostics_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.json"
+        )
+        with open(output_file, "w") as f:
             json.dump(self.results, f, indent=2)
 
         logger.info(f"\nDetailed results saved to: {output_file}")
@@ -533,9 +519,7 @@ async def main():
 
     parser = argparse.ArgumentParser(description="WhatsApp Integration Diagnostics")
     parser.add_argument(
-        "--connection-id",
-        help="Specific connection ID to test",
-        default=None
+        "--connection-id", help="Specific connection ID to test", default=None
     )
 
     args = parser.parse_args()

@@ -57,9 +57,7 @@ class CorrelationIdMiddleware(BaseHTTPMiddleware):
         self.header_name = header_name
         self.request_id_header = request_id_header
 
-    async def dispatch(
-        self, request: Request, call_next: Callable
-    ) -> Response:
+    async def dispatch(self, request: Request, call_next: Callable) -> Response:
         """
         Process request and add correlation ID.
 
@@ -71,14 +69,10 @@ class CorrelationIdMiddleware(BaseHTTPMiddleware):
             Response with correlation ID header
         """
         # Get or generate correlation ID
-        correlation_id = request.headers.get(
-            self.header_name, str(uuid.uuid4())
-        )
+        correlation_id = request.headers.get(self.header_name, str(uuid.uuid4()))
 
         # Get or generate request ID
-        request_id = request.headers.get(
-            self.request_id_header, str(uuid.uuid4())
-        )
+        request_id = request.headers.get(self.request_id_header, str(uuid.uuid4()))
 
         # Set in context vars
         correlation_id_var.set(correlation_id)
@@ -116,7 +110,7 @@ class CorrelationIdMiddleware(BaseHTTPMiddleware):
                     "duration": duration,
                     "client_ip": request.client.host if request.client else None,
                     "user_agent": request.headers.get("user-agent"),
-                }
+                },
             )
 
             return response
@@ -138,7 +132,7 @@ class CorrelationIdMiddleware(BaseHTTPMiddleware):
                     "endpoint": request.url.path,
                     "duration": duration,
                     "client_ip": request.client.host if request.client else None,
-                }
+                },
             )
 
             raise

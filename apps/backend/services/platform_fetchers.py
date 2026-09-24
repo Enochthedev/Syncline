@@ -14,14 +14,13 @@ import logging
 from typing import Any, Dict, List, Optional
 
 from integrations.base_connector import BaseConnector
+from integrations.discord_connector import DiscordConnector
 from integrations.gmail_connector import GmailConnector
 from integrations.slack_connector import SlackConnector
-from integrations.discord_connector import DiscordConnector
-from integrations.whatsapp_connector import WhatsAppConnector
-from integrations.twitter_connector import TwitterConnector
 from integrations.telegram_connector import TelegramConnector
+from integrations.twitter_connector import TwitterConnector
+from integrations.whatsapp_connector import WhatsAppConnector
 from services.historical_fetcher import FetchCheckpoint
-
 
 logger = logging.getLogger(__name__)
 
@@ -29,6 +28,7 @@ logger = logging.getLogger(__name__)
 # =============================================================================
 # Gmail Historical Fetcher
 # =============================================================================
+
 
 async def fetch_gmail_historical(
     connector: GmailConnector,
@@ -38,15 +38,15 @@ async def fetch_gmail_historical(
 ) -> Dict[str, Any]:
     """
     Fetch historical messages from Gmail.
-    
+
     Uses Gmail API's list messages endpoint with pagination.
-    
+
     Args:
         connector: Gmail connector instance
         page_token: Pagination token from previous request
         batch_size: Number of messages to fetch
         checkpoint: Current fetch checkpoint
-    
+
     Returns:
         Dictionary with:
         - messages: List of message data
@@ -59,30 +59,27 @@ async def fetch_gmail_historical(
             max_results=batch_size,
             page_token=page_token,
         )
-        
+
         # Get full message details for each message
         messages = []
         for msg_ref in result.get("messages", []):
             try:
                 # Fetch full message data
                 full_message = await connector.get_message(
-                    message_id=msg_ref["id"],
-                    format="full"
+                    message_id=msg_ref["id"], format="full"
                 )
                 messages.append(full_message)
             except Exception as e:
-                logger.error(
-                    f"Error fetching Gmail message {msg_ref['id']}: {e}"
-                )
+                logger.error(f"Error fetching Gmail message {msg_ref['id']}: {e}")
                 # Continue with other messages
                 continue
-        
+
         return {
             "messages": messages,
             "next_page_token": result.get("next_page_token"),
             "result_size_estimate": result.get("result_size_estimate", 0),
         }
-    
+
     except Exception as e:
         logger.error(f"Error fetching Gmail historical messages: {e}")
         raise
@@ -92,6 +89,7 @@ async def fetch_gmail_historical(
 # Slack Historical Fetcher
 # =============================================================================
 
+
 async def fetch_slack_historical(
     connector: SlackConnector,
     page_token: Optional[str] = None,
@@ -100,15 +98,15 @@ async def fetch_slack_historical(
 ) -> Dict[str, Any]:
     """
     Fetch historical messages from Slack.
-    
+
     Uses Slack API's conversations.history with cursor-based pagination.
-    
+
     Args:
         connector: Slack connector instance
         page_token: Cursor token from previous request
         batch_size: Number of messages to fetch
         checkpoint: Current fetch checkpoint
-    
+
     Returns:
         Dictionary with:
         - messages: List of message data
@@ -117,18 +115,18 @@ async def fetch_slack_historical(
     try:
         # TODO: Implement Slack historical fetch
         # This is a placeholder implementation
-        
+
         logger.info(
             f"Slack historical fetch - placeholder "
             f"(cursor={page_token}, limit={batch_size})"
         )
-        
+
         # Placeholder return
         return {
             "messages": [],
             "next_page_token": None,
         }
-    
+
     except Exception as e:
         logger.error(f"Error fetching Slack historical messages: {e}")
         raise
@@ -138,6 +136,7 @@ async def fetch_slack_historical(
 # Discord Historical Fetcher
 # =============================================================================
 
+
 async def fetch_discord_historical(
     connector: DiscordConnector,
     page_token: Optional[str] = None,
@@ -146,15 +145,15 @@ async def fetch_discord_historical(
 ) -> Dict[str, Any]:
     """
     Fetch historical messages from Discord.
-    
+
     Uses Discord API's get channel messages with snowflake-based pagination.
-    
+
     Args:
         connector: Discord connector instance
         page_token: Message ID (snowflake) for pagination
         batch_size: Number of messages to fetch
         checkpoint: Current fetch checkpoint
-    
+
     Returns:
         Dictionary with:
         - messages: List of message data
@@ -163,18 +162,18 @@ async def fetch_discord_historical(
     try:
         # TODO: Implement Discord historical fetch
         # This is a placeholder implementation
-        
+
         logger.info(
             f"Discord historical fetch - placeholder "
             f"(before={page_token}, limit={batch_size})"
         )
-        
+
         # Placeholder return
         return {
             "messages": [],
             "next_page_token": None,
         }
-    
+
     except Exception as e:
         logger.error(f"Error fetching Discord historical messages: {e}")
         raise
@@ -184,6 +183,7 @@ async def fetch_discord_historical(
 # WhatsApp Historical Fetcher
 # =============================================================================
 
+
 async def fetch_whatsapp_historical(
     connector: WhatsAppConnector,
     page_token: Optional[str] = None,
@@ -192,15 +192,15 @@ async def fetch_whatsapp_historical(
 ) -> Dict[str, Any]:
     """
     Fetch historical messages from WhatsApp via Mautrix bridge.
-    
+
     Uses Matrix protocol to fetch message history from synced rooms.
-    
+
     Args:
         connector: WhatsApp connector instance
         page_token: Matrix pagination token
         batch_size: Number of messages to fetch
         checkpoint: Current fetch checkpoint
-    
+
     Returns:
         Dictionary with:
         - messages: List of message data
@@ -209,18 +209,18 @@ async def fetch_whatsapp_historical(
     try:
         # TODO: Implement WhatsApp/Mautrix historical fetch
         # This is a placeholder implementation
-        
+
         logger.info(
             f"WhatsApp historical fetch - placeholder "
             f"(from={page_token}, limit={batch_size})"
         )
-        
+
         # Placeholder return
         return {
             "messages": [],
             "next_page_token": None,
         }
-    
+
     except Exception as e:
         logger.error(f"Error fetching WhatsApp historical messages: {e}")
         raise
@@ -230,6 +230,7 @@ async def fetch_whatsapp_historical(
 # Twitter Historical Fetcher
 # =============================================================================
 
+
 async def fetch_twitter_historical(
     connector: TwitterConnector,
     page_token: Optional[str] = None,
@@ -238,15 +239,15 @@ async def fetch_twitter_historical(
 ) -> Dict[str, Any]:
     """
     Fetch historical messages from Twitter.
-    
+
     Uses Twitter API v2 to fetch user timeline and mentions.
-    
+
     Args:
         connector: Twitter connector instance
         page_token: Pagination token from previous request
         batch_size: Number of tweets to fetch
         checkpoint: Current fetch checkpoint
-    
+
     Returns:
         Dictionary with:
         - messages: List of tweet data
@@ -255,18 +256,18 @@ async def fetch_twitter_historical(
     try:
         # TODO: Implement Twitter historical fetch
         # This is a placeholder implementation
-        
+
         logger.info(
             f"Twitter historical fetch - placeholder "
             f"(pagination_token={page_token}, max_results={batch_size})"
         )
-        
+
         # Placeholder return
         return {
             "messages": [],
             "next_page_token": None,
         }
-    
+
     except Exception as e:
         logger.error(f"Error fetching Twitter historical messages: {e}")
         raise
@@ -276,6 +277,7 @@ async def fetch_twitter_historical(
 # Telegram Historical Fetcher
 # =============================================================================
 
+
 async def fetch_telegram_historical(
     connector: TelegramConnector,
     page_token: Optional[str] = None,
@@ -284,15 +286,15 @@ async def fetch_telegram_historical(
 ) -> Dict[str, Any]:
     """
     Fetch historical messages from Telegram.
-    
+
     Uses Telegram Bot API or MTProto to fetch message history.
-    
+
     Args:
         connector: Telegram connector instance
         page_token: Offset ID for pagination
         batch_size: Number of messages to fetch
         checkpoint: Current fetch checkpoint
-    
+
     Returns:
         Dictionary with:
         - messages: List of message data
@@ -301,18 +303,18 @@ async def fetch_telegram_historical(
     try:
         # TODO: Implement Telegram historical fetch
         # This is a placeholder implementation
-        
+
         logger.info(
             f"Telegram historical fetch - placeholder "
             f"(offset={page_token}, limit={batch_size})"
         )
-        
+
         # Placeholder return
         return {
             "messages": [],
             "next_page_token": None,
         }
-    
+
     except Exception as e:
         logger.error(f"Error fetching Telegram historical messages: {e}")
         raise
@@ -335,13 +337,13 @@ PLATFORM_FETCHERS = {
 def get_platform_fetcher(platform: str):
     """
     Get the appropriate historical fetcher for a platform.
-    
+
     Args:
         platform: Platform name
-    
+
     Returns:
         Platform-specific fetch function
-    
+
     Raises:
         ValueError: If platform is not supported
     """

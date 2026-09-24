@@ -4,9 +4,10 @@ Authentication Tests
 Tests for JWT authentication and authorization.
 """
 
+from unittest.mock import patch
+
 import pytest
 from httpx import AsyncClient
-from unittest.mock import patch
 
 
 class TestAuthEndpoints:
@@ -21,8 +22,8 @@ class TestAuthEndpoints:
                 "email": "test@example.com",
                 "username": "testuser",
                 "password": "testpassword123",
-                "full_name": "Test User"
-            }
+                "full_name": "Test User",
+            },
         )
         # May fail if database not set up, which is OK for CI
         assert response.status_code in [201, 500]
@@ -33,10 +34,7 @@ class TestAuthEndpoints:
         # This will fail without a database, which is expected
         response = await client.post(
             "/api/v1/auth/login",
-            json={
-                "username": "testuser",
-                "password": "testpassword123"
-            }
+            json={"username": "testuser", "password": "testpassword123"},
         )
         assert response.status_code in [200, 401, 500]
 
@@ -52,16 +50,15 @@ class TestJWTService:
 
     def test_create_access_token(self):
         """Test access token creation."""
-        from services.auth.jwt_service import get_jwt_service
         from uuid import uuid4
+
+        from services.auth.jwt_service import get_jwt_service
 
         jwt_service = get_jwt_service()
         user_id = uuid4()
 
         token = jwt_service.create_access_token(
-            user_id=user_id,
-            email="test@example.com",
-            role="user"
+            user_id=user_id, email="test@example.com", role="user"
         )
 
         assert token is not None
@@ -69,16 +66,15 @@ class TestJWTService:
 
     def test_decode_token(self):
         """Test token decoding."""
-        from services.auth.jwt_service import get_jwt_service
         from uuid import uuid4
+
+        from services.auth.jwt_service import get_jwt_service
 
         jwt_service = get_jwt_service()
         user_id = uuid4()
 
         token = jwt_service.create_access_token(
-            user_id=user_id,
-            email="test@example.com",
-            role="user"
+            user_id=user_id, email="test@example.com", role="user"
         )
 
         claims = jwt_service.decode_token(token)

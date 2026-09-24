@@ -4,7 +4,7 @@ Custom Exception Types for WhatsApp Integration
 Provides granular error types for better error handling and debugging.
 """
 
-from typing import Optional, Dict, Any
+from typing import Any, Dict, Optional
 
 
 class WhatsAppError(Exception):
@@ -18,7 +18,7 @@ class WhatsAppError(Exception):
         self,
         message: str,
         connection_id: Optional[str] = None,
-        details: Optional[Dict[str, Any]] = None
+        details: Optional[Dict[str, Any]] = None,
     ):
         """
         Initialize WhatsApp error.
@@ -50,12 +50,7 @@ class BridgeError(WhatsAppError):
     Raised when the bridge is unreachable or returns an error.
     """
 
-    def __init__(
-        self,
-        message: str,
-        bridge_command: Optional[str] = None,
-        **kwargs
-    ):
+    def __init__(self, message: str, bridge_command: Optional[str] = None, **kwargs):
         """
         Initialize bridge error.
 
@@ -79,7 +74,7 @@ class BridgeTimeoutError(BridgeError):
         self,
         message: str = "Bridge response timed out",
         timeout_seconds: Optional[float] = None,
-        **kwargs
+        **kwargs,
     ):
         """
         Initialize bridge timeout error.
@@ -104,7 +99,7 @@ class RoomNotFoundError(WhatsAppError):
         self,
         message: str = "Matrix room not found",
         room_id: Optional[str] = None,
-        **kwargs
+        **kwargs,
     ):
         """
         Initialize room not found error.
@@ -129,7 +124,7 @@ class AuthenticationError(WhatsAppError):
         self,
         message: str = "WhatsApp authentication failed",
         phone_number: Optional[str] = None,
-        **kwargs
+        **kwargs,
     ):
         """
         Initialize authentication error.
@@ -160,12 +155,7 @@ class QRCodeError(WhatsAppError):
     Raised when QR code cannot be generated or has expired.
     """
 
-    def __init__(
-        self,
-        message: str = "QR code error",
-        expired: bool = False,
-        **kwargs
-    ):
+    def __init__(self, message: str = "QR code error", expired: bool = False, **kwargs):
         """
         Initialize QR code error.
 
@@ -189,7 +179,7 @@ class MessageSendError(WhatsAppError):
         self,
         message: str = "Failed to send message",
         recipient: Optional[str] = None,
-        **kwargs
+        **kwargs,
     ):
         """
         Initialize message send error.
@@ -214,7 +204,7 @@ class MessageSyncError(WhatsAppError):
         self,
         message: str = "Failed to sync messages",
         sync_type: Optional[str] = None,  # "full", "incremental", etc.
-        **kwargs
+        **kwargs,
     ):
         """
         Initialize message sync error.
@@ -239,7 +229,7 @@ class ConfigurationError(WhatsAppError):
         self,
         message: str = "Invalid WhatsApp configuration",
         config_key: Optional[str] = None,
-        **kwargs
+        **kwargs,
     ):
         """
         Initialize configuration error.
@@ -264,7 +254,7 @@ class RateLimitError(WhatsAppError):
         self,
         message: str = "Rate limit exceeded",
         retry_after: Optional[int] = None,  # Seconds until retry allowed
-        **kwargs
+        **kwargs,
     ):
         """
         Initialize rate limit error.
@@ -286,10 +276,7 @@ class ConnectionError(WhatsAppError):
     """
 
     def __init__(
-        self,
-        message: str = "Connection failed",
-        host: Optional[str] = None,
-        **kwargs
+        self, message: str = "Connection failed", host: Optional[str] = None, **kwargs
     ):
         """
         Initialize connection error.

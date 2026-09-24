@@ -7,19 +7,19 @@ in the blob storage system with proper metadata tracking.
 
 import logging
 import os
-from typing import Optional, List, Dict, Any
+from typing import Any, Dict, List, Optional
 from uuid import UUID
-import aiohttp
 
-from sqlalchemy.ext.asyncio import AsyncSession
+import aiohttp
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from db.models.attachment import Attachment
 from db.models.message import Message
 from services.storage.blob_storage import (
-    get_default_storage_manager,
+    BlobNotFoundError,
     BlobStorageError,
-    BlobNotFoundError
+    get_default_storage_manager,
 )
 
 logger = logging.getLogger(__name__)
@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 class AttachmentHandler:
     """
     Handler for message attachment operations.
-    
+
     Manages downloading attachments from platform URLs and storing
     them in the blob storage system with database metadata.
     """
@@ -36,7 +36,7 @@ class AttachmentHandler:
     def __init__(self, storage_manager=None):
         """
         Initialize attachment handler.
-        
+
         Args:
             storage_manager: Optional BlobStorageManager instance
         """
@@ -50,11 +50,11 @@ class AttachmentHandler:
         platform_url: str,
         filename: str,
         mime_type: Optional[str] = None,
-        timeout: int = 30
+        timeout: int = 30,
     ) -> Attachment:
         """
         Download attachment from URL and store it.
-        
+
         Args:
             db: Database session
             message_id: ID of the message this attachment belongs to
@@ -62,10 +62,10 @@ class AttachmentHandler:
             filename: Original filename
             mime_type: MIME type of the file
             timeout: Download timeout in seconds
-            
+
         Returns:
             Created Attachment model instance
-            
+
         Raises:
             BlobStorageError: If download or storage fails
         """
@@ -75,14 +75,12 @@ class AttachmentHandler:
 
             # Download and store the file
             stored_path = await self.storage_manager.store_from_url(
-                url=platform_url,
-                storage_path=storage_path,
-                timeout=timeout
+                url=platform_url, storage_path=storage_path, timeout=timeout
             )
 
             # Get file metadata
             metadata = await self.storage_manager.get_metadata(stored_path)
-            file_size = metadata.get('size', 0)
+            file_size = metadata.get("size", 0)
 
             # Create attachment record in database
             attachment = Attachment(
@@ -91,7 +89,7 @@ class AttachmentHandler:
                 mime_type=mime_type,
                 size_bytes=file_size,
                 storage_path=stored_path,
-                platform_url=platform_url
+                platform_url=platform_url,
             )
 
             db.add(attachment)
@@ -108,8 +106,7 @@ class AttachmentHandler:
         except Exception as e:
             await db.rollback()
             logger.error(
-                f"Failed to download attachment {filename} "
-                f"from {platform_url}: {e}"
+                f"Failed to download attachment {filename} " f"from {platform_url}: {e}"
             )
             raise
 
@@ -120,11 +117,11 @@ class AttachmentHandler:
         filename: str,
         content: bytes,
         mime_type: Optional[str] = None,
-        platform_url: Optional[str] = None
+        platform_url: Optional[str] = None,
     ) -> Attachment:
         """
         Store attachment content directly (without downloading).
-        
+
         Args:
             db: Database session
             message_id: ID of the message this attachment belongs to
@@ -132,10 +129,10 @@ class AttachmentHandler:
             content: File content as bytes
             mime_type: MIME type of the file
             platform_url: Optional original platform URL
-            
+
         Returns:
             Created Attachment model instance
-            
+
         Raises:
             BlobStorageError: If storage fails
         """
@@ -145,9 +142,7 @@ class AttachmentHandler:
 
             # Store the file
             stored_path = await self.storage_manager.store(
-                path=storage_path,
-                content=content,
-                content_type=mime_type
+                path=storage_path, content=content, content_type=mime_type
             )
 
             # Create attachment record in database
@@ -157,7 +152,7 @@ class AttachmentHandler:
                 mime_type=mime_type,
                 size_bytes=len(content),
                 storage_path=stored_path,
-                platform_url=platform_url
+                platform_url=platform_url,
             )
 
             db.add(attachment)
@@ -177,20 +172,18 @@ class AttachmentHandler:
             raise
 
     async def get_attachment_content(
-        self,
-        db: AsyncSession,
-        attachment_id: UUID
+        self, db: AsyncSession, attachment_id: UUID
     ) -> bytes:
         """
         Retrieve attachment content from storage.
-        
+
         Args:
             db: Database session
             attachment_id: ID of the attachment
-            
+
         Returns:
             File content as bytes
-            
+
         Raises:
             ValueError: If attachment not found in database
             BlobNotFoundError: If file not found in storage
@@ -219,18 +212,14 @@ class AttachmentHandler:
             logger.error(f"Failed to get attachment content {attachment_id}: {e}")
             raise
 
-    async def delete_attachment(
-        self,
-        db: AsyncSession,
-        attachment_id: UUID
-    ) -> bool:
+    async def delete_attachment(self, db: AsyncSession, attachment_id: UUID) -> bool:
         """
         Delete attachment from storage and database.
-        
+
         Args:
             db: Database session
             attachment_id: ID of the attachment to delete
-            
+
         Returns:
             True if deleted, False if not found
         """
@@ -265,17 +254,15 @@ class AttachmentHandler:
             raise
 
     async def get_message_attachments(
-        self,
-        db: AsyncSession,
-        message_id: UUID
+        self, db: AsyncSession, message_id: UUID
     ) -> List[Attachment]:
         """
         Get all attachments for a message.
-        
+
         Args:
             db: Database session
             message_id: ID of the message
-            
+
         Returns:
             List of Attachment instances
         """
@@ -287,7 +274,9 @@ class AttachmentHandler:
             )
             attachments = result.scalars().all()
 
-            logger.debug(f"Found {len(attachments)} attachments for message {message_id}")
+            logger.debug(
+                f"Found {len(attachments)} attachments for message {message_id}"
+            )
             return list(attachments)
 
         except Exception as e:
@@ -295,14 +284,11 @@ class AttachmentHandler:
             raise
 
     async def process_message_attachments(
-        self,
-        db: AsyncSession,
-        message_id: UUID,
-        attachment_data: List[Dict[str, Any]]
+        self, db: AsyncSession, message_id: UUID, attachment_data: List[Dict[str, Any]]
     ) -> List[Attachment]:
         """
         Process and store multiple attachments for a message.
-        
+
         Args:
             db: Database session
             message_id: ID of the message
@@ -310,7 +296,7 @@ class AttachmentHandler:
                 - url: Platform URL to download from
                 - filename: Original filename
                 - mime_type: Optional MIME type
-                
+
         Returns:
             List of created Attachment instances
         """
@@ -321,9 +307,9 @@ class AttachmentHandler:
                 attachment = await self.download_and_store_attachment(
                     db=db,
                     message_id=message_id,
-                    platform_url=data['url'],
-                    filename=data['filename'],
-                    mime_type=data.get('mime_type')
+                    platform_url=data["url"],
+                    filename=data["filename"],
+                    mime_type=data.get("mime_type"),
                 )
                 attachments.append(attachment)
 
@@ -344,7 +330,7 @@ class AttachmentHandler:
     async def health_check(self) -> Dict[str, Any]:
         """
         Perform health check on attachment handler.
-        
+
         Returns:
             Health status dictionary
         """
@@ -352,16 +338,13 @@ class AttachmentHandler:
             storage_health = await self.storage_manager.health_check()
 
             return {
-                'status': storage_health['status'],
-                'storage': storage_health,
-                'stats': self.storage_manager.get_stats()
+                "status": storage_health["status"],
+                "storage": storage_health,
+                "stats": self.storage_manager.get_stats(),
             }
 
         except Exception as e:
-            return {
-                'status': 'unhealthy',
-                'error': str(e)
-            }
+            return {"status": "unhealthy", "error": str(e)}
 
 
 # Global attachment handler instance
@@ -371,7 +354,7 @@ _default_attachment_handler: Optional[AttachmentHandler] = None
 def get_default_attachment_handler() -> AttachmentHandler:
     """
     Get the default attachment handler instance.
-    
+
     Returns:
         AttachmentHandler instance
     """

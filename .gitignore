@@ -12,7 +12,7 @@ venv/
 .venv/
 node_modules/
 .idea/
-// add credentials.jsoon in the config folder
+# add credentials.json in the config folder
 config/credentials.json
 token.json
 *.DS_Store
@@ -30,3 +30,9 @@ ops/
 # Future app directories (add when ready to track)
 apps/mobile/
 apps/web/
+
+# AI assistant tooling
+.kiro/
+.claude/
+CLAUDE.md
+.agent/

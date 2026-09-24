@@ -29,12 +29,12 @@ _connection_pool: ConnectionPool | None = None
 def get_connection_pool() -> ConnectionPool:
     """
     Get or create the global Redis connection pool.
-    
+
     Returns:
         ConnectionPool instance configured with settings
     """
     global _connection_pool
-    
+
     if _connection_pool is None:
         _connection_pool = ConnectionPool.from_url(
             settings.REDIS_URL,
@@ -44,24 +44,24 @@ def get_connection_pool() -> ConnectionPool:
             encoding="utf-8",
         )
         logger.info(f"Redis connection pool created: {settings.REDIS_URL}")
-    
+
     return _connection_pool
 
 
 def get_redis_client() -> Redis:
     """
     Get or create the global Redis client.
-    
+
     Returns:
         Redis client instance
     """
     global _redis_client
-    
+
     if _redis_client is None:
         pool = get_connection_pool()
         _redis_client = Redis(connection_pool=pool)
         logger.info("Redis client created")
-    
+
     return _redis_client
 
 
@@ -69,11 +69,11 @@ def get_redis_client() -> Redis:
 async def get_redis() -> AsyncGenerator[Redis, None]:
     """
     Async context manager for Redis connections.
-    
+
     Usage:
         async with get_redis() as redis_conn:
             await redis_conn.set("key", "value")
-    
+
     Yields:
         Redis client instance
     """
@@ -91,15 +91,15 @@ async def get_redis() -> AsyncGenerator[Redis, None]:
 async def init_redis() -> None:
     """
     Initialize Redis connection and verify connectivity.
-    
+
     This should be called during application startup.
     """
     try:
         client = get_redis_client()
-        
+
         # Test connection with ping
         await client.ping()
-        
+
         logger.info("Redis connection initialized successfully")
     except Exception as e:
         logger.error(f"Failed to initialize Redis: {e}")
@@ -109,26 +109,26 @@ async def init_redis() -> None:
 async def close_redis() -> None:
     """
     Close Redis connections and dispose of the connection pool.
-    
+
     This should be called during application shutdown.
     """
     global _redis_client, _connection_pool
-    
+
     if _redis_client is not None:
         await _redis_client.close()
         _redis_client = None
-    
+
     if _connection_pool is not None:
         await _connection_pool.disconnect()
         _connection_pool = None
-    
+
     logger.info("Redis connections closed")
 
 
 async def health_check() -> bool:
     """
     Check Redis connection health.
-    
+
     Returns:
         True if Redis is healthy, False otherwise
     """

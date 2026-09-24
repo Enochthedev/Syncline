@@ -15,15 +15,15 @@ Note: Actual data migration (encrypting existing credentials) happens lazily
 via the PlatformConnection.migrate_to_encrypted() method when connections
 are accessed.
 """
+
 from typing import Sequence, Union
 
-from alembic import op
 import sqlalchemy as sa
-
+from alembic import op
 
 # revision identifiers, used by Alembic.
-revision: str = 'b6928c7e6097'
-down_revision: Union[str, None] = '9a4f32d90c53'
+revision: str = "b6928c7e6097"
+down_revision: Union[str, None] = "9a4f32d90c53"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
@@ -37,8 +37,8 @@ def upgrade() -> None:
     """
     # Add new encrypted credentials column
     op.add_column(
-        'platform_connections',
-        sa.Column('credentials_encrypted', sa.Text(), nullable=True)
+        "platform_connections",
+        sa.Column("credentials_encrypted", sa.Text(), nullable=True),
     )
 
     # Note: We do NOT drop the old credentials column yet to maintain
@@ -52,4 +52,4 @@ def downgrade() -> None:
     WARNING: This will lose encrypted credentials. Only run if you're
     certain you want to revert to unencrypted storage.
     """
-    op.drop_column('platform_connections', 'credentials_encrypted')
+    op.drop_column("platform_connections", "credentials_encrypted")
