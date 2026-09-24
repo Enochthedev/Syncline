@@ -11,6 +11,7 @@ from typing import AsyncGenerator
 
 import httpx
 import pytest
+import pytest_asyncio
 
 # Try to import app, but allow tests to run without it
 try:
@@ -39,15 +40,30 @@ def pytest_configure(config):
 
 
 def pytest_collection_modifyitems(config, items):
-    """Auto-mark tests based on their location."""
+    """Auto-mark tests based on their location, and skip what needs a server.
+
+    The security and performance suites talk to a running instance over HTTP
+    (``TEST_URL``, default http://localhost:8000). With nothing listening they
+    do not fail meaningfully — every one of them reports a connection error —
+    so they are skipped unless TEST_URL is set explicitly.
+    """
+    needs_server = os.getenv("TEST_URL") is None
+    skip_no_server = pytest.mark.skip(
+        reason="needs a running instance: set TEST_URL to the base URL"
+    )
+
     for item in items:
         # Auto-mark security tests
         if "security" in str(item.fspath):
             item.add_marker(pytest.mark.security)
+            if needs_server:
+                item.add_marker(skip_no_server)
 
         # Auto-mark performance tests
         if "performance" in str(item.fspath):
             item.add_marker(pytest.mark.performance)
+            if needs_server:
+                item.add_marker(skip_no_server)
 
 
 # ==============================================================================
@@ -68,11 +84,18 @@ def event_loop():
 # ==============================================================================
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def client() -> AsyncGenerator[httpx.AsyncClient, None]:
-    """Create async test client with app (for unit testing)."""
+    """Async client bound to the app in-process, or to TEST_URL if set.
+
+    This has to be a ``pytest_asyncio.fixture``: under pytest-asyncio's strict
+    mode a plain ``pytest.fixture`` hands the test the async generator itself,
+    which is why every test using it failed with "'async_generator' object has
+    no attribute 'get'".
+    """
     if APP_AVAILABLE and app:
-        async with httpx.AsyncClient(app=app, base_url="http://test") as ac:
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as ac:
             yield ac
     else:
         # Fall back to external client
