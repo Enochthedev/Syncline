@@ -7,19 +7,24 @@ including performance and security test suites.
 
 import asyncio
 import os
-from typing import AsyncGenerator
+from typing import AsyncGenerator, Optional
 
 import httpx
 import pytest
 import pytest_asyncio
 
-# Try to import app, but allow tests to run without it
+# Try to import app, but allow tests to run without it. Catch everything:
+# importing main pulls in settings validation and every router, so a failure
+# here is as likely to be a config error as a missing module — and swallowing
+# the reason is how these tests ended up silently talking to localhost:8000.
 try:
     from main import app
 
     APP_AVAILABLE = True
-except ImportError:
+    APP_IMPORT_ERROR: Optional[BaseException] = None
+except Exception as exc:  # noqa: BLE001 - reported below, not hidden
     APP_AVAILABLE = False
+    APP_IMPORT_ERROR = exc
     app = None
 
 
