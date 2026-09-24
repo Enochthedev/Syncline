@@ -318,5 +318,5 @@ structlog==24.4.0
 python-multipart==0.0.9
 email-validator==2.1.0
 bcrypt==4.1.2
-passlib==1.7.4qrcode[pil]==7.4.2
+passlib==1.7.4
 qrcode[pil]==7.4.2
