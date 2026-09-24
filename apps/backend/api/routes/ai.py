@@ -12,10 +12,10 @@ Provides AI-powered functionality:
 """
 
 import logging
-from datetime import datetime, timedelta
-from typing import Optional, Dict
-from uuid import UUID
 import random
+from datetime import datetime, timedelta
+from typing import Dict, Optional
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
@@ -27,18 +27,18 @@ from db.models.message import Message
 from db.models.thread import Thread
 from services.ai.embeddings import get_embedding_service
 from services.ai.entity_extraction import (
-    get_entity_extraction_service,
     EntityType,
+    get_entity_extraction_service,
 )
 from services.ai.insight_generator import get_insight_generator
 from services.ai.semantic_search import (
-    get_semantic_search_engine,
-    SearchFilter,
     MessageSearchResult,
+    SearchFilter,
+    get_semantic_search_engine,
 )
-from services.ai.summary.agent import get_summary_agent, SummaryType
+from services.ai.summary.agent import SummaryType, get_summary_agent
 from services.event_bus import get_event_bus
-from services.events.types import EventType, AIEvent
+from services.events.types import AIEvent, EventType
 
 logger = logging.getLogger(__name__)
 
@@ -56,12 +56,24 @@ class SemanticSearchRequest(BaseModel):
     """Request model for semantic search."""
 
     query: str = Field(..., min_length=1, description="Search query text")
-    platforms: Optional[list[str]] = Field(default=None, description="Filter by platforms")
-    thread_ids: Optional[list[str]] = Field(default=None, description="Filter by thread IDs")
-    start_date: Optional[datetime] = Field(default=None, description="Filter messages after this date")
-    end_date: Optional[datetime] = Field(default=None, description="Filter messages before this date")
-    min_score: Optional[float] = Field(default=None, ge=0.0, le=1.0, description="Minimum similarity score")
-    limit: int = Field(default=10, ge=1, le=100, description="Maximum number of results")
+    platforms: Optional[list[str]] = Field(
+        default=None, description="Filter by platforms"
+    )
+    thread_ids: Optional[list[str]] = Field(
+        default=None, description="Filter by thread IDs"
+    )
+    start_date: Optional[datetime] = Field(
+        default=None, description="Filter messages after this date"
+    )
+    end_date: Optional[datetime] = Field(
+        default=None, description="Filter messages before this date"
+    )
+    min_score: Optional[float] = Field(
+        default=None, ge=0.0, le=1.0, description="Minimum similarity score"
+    )
+    limit: int = Field(
+        default=10, ge=1, le=100, description="Maximum number of results"
+    )
 
 
 class SemanticSearchResponse(BaseModel):
@@ -79,12 +91,10 @@ class SummarizeRequest(BaseModel):
     """Request model for thread summarization."""
 
     summary_type: SummaryType = Field(
-        default=SummaryType.BRIEF,
-        description="Type of summary to generate"
+        default=SummaryType.BRIEF, description="Type of summary to generate"
     )
     force_regenerate: bool = Field(
-        default=False,
-        description="Force regeneration if summary exists"
+        default=False, description="Force regeneration if summary exists"
     )
 
 
@@ -153,8 +163,12 @@ class NaturalLanguageQueryRequest(BaseModel):
     """Request model for natural language query."""
 
     question: str = Field(..., min_length=1, description="Natural language question")
-    context: Optional[dict] = Field(default=None, description="Additional context for query")
-    limit: int = Field(default=10, ge=1, le=100, description="Maximum number of results")
+    context: Optional[dict] = Field(
+        default=None, description="Additional context for query"
+    )
+    limit: int = Field(
+        default=10, ge=1, le=100, description="Maximum number of results"
+    )
 
 
 class NaturalLanguageQueryResponse(BaseModel):
@@ -168,18 +182,24 @@ class NaturalLanguageQueryResponse(BaseModel):
 
 class MemoryRecommendationContext(BaseModel):
     """Context for generating recommendations."""
-    
-    current_contact: Optional[str] = Field(default=None, description="Current contact ID")
+
+    current_contact: Optional[str] = Field(
+        default=None, description="Current contact ID"
+    )
     current_thread: Optional[str] = Field(default=None, description="Current thread ID")
-    current_platform: Optional[str] = Field(default=None, description="Current platform")
+    current_platform: Optional[str] = Field(
+        default=None, description="Current platform"
+    )
     keywords: Optional[list[str]] = Field(default=None, description="Relevant keywords")
 
 
 class MemoryRecommendationItem(BaseModel):
     """A single memory recommendation."""
-    
+
     id: str
-    type: str = Field(description="Recommendation type: commitment, follow_up, relationship, context")
+    type: str = Field(
+        description="Recommendation type: commitment, follow_up, relationship, context"
+    )
     title: str
     description: str
     priority: float = Field(ge=0.0, le=1.0, description="Priority score")
@@ -191,14 +211,14 @@ class MemoryRecommendationItem(BaseModel):
 
 class MemoryRecommendationsResponse(BaseModel):
     """Response model for memory recommendations."""
-    
+
     recommendations: list[MemoryRecommendationItem]
     total: int
 
 
 class MemoryStatsResponse(BaseModel):
     """Response model for memory statistics."""
-    
+
     total_memories: int = 0
     memories_by_type: dict = Field(default_factory=dict)
     memories_by_importance: dict = Field(default_factory=dict)
@@ -211,27 +231,33 @@ class DateRange(BaseModel):
     start: datetime
     end: datetime
 
+
 class AnalyzePatternsRequest(BaseModel):
     contact_id: Optional[UUID] = None
     platform: Optional[str] = None
     date_range: Optional[DateRange] = None
+
 
 class TopicTrend(BaseModel):
     topic: str
     frequency: int
     trend: str  # increasing, decreasing, stable
 
+
 class SentimentPoint(BaseModel):
     date: str
     sentiment: float
+
 
 class SentimentAnalysis(BaseModel):
     overall_sentiment: str  # positive, neutral, negative
     sentiment_over_time: list[SentimentPoint]
 
+
 class ResponsePatterns(BaseModel):
     avg_response_time: float
     response_rate: float
+
 
 class AnalyzePatternsResponse(BaseModel):
     communication_frequency: Dict[str, int]
@@ -246,9 +272,7 @@ class AnalyzePatternsResponse(BaseModel):
 
 
 @router.get(
-    "/health",
-    summary="AI Services Health",
-    description="Check health of AI services"
+    "/health", summary="AI Services Health", description="Check health of AI services"
 )
 async def ai_health_check() -> dict:
     """
@@ -345,7 +369,7 @@ async def ai_health_check() -> dict:
     "/search",
     response_model=SemanticSearchResponse,
     summary="Semantic Search",
-    description="Search messages using semantic similarity"
+    description="Search messages using semantic similarity",
 )
 async def semantic_search(
     request: SemanticSearchRequest,
@@ -400,7 +424,7 @@ async def semantic_search(
         logger.error(f"Semantic search failed: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Search failed: {str(e)}"
+            detail=f"Search failed: {str(e)}",
         )
 
 
@@ -408,7 +432,7 @@ async def semantic_search(
     "/summarize/{thread_id}",
     response_model=SummaryResponse,
     summary="Generate Thread Summary",
-    description="Generate AI-powered summary of a conversation thread"
+    description="Generate AI-powered summary of a conversation thread",
 )
 async def summarize_thread(
     thread_id: UUID,
@@ -449,7 +473,7 @@ async def summarize_thread(
         if not summary:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Thread {thread_id} not found or summarization failed"
+                detail=f"Thread {thread_id} not found or summarization failed",
             )
 
         # Emit event
@@ -463,7 +487,7 @@ async def summarize_thread(
                     payload={
                         "thread_id": str(thread_id),
                         "summary_type": request.summary_type.value,
-                    }
+                    },
                 )
             )
         except Exception as e:
@@ -483,7 +507,7 @@ async def summarize_thread(
         logger.error(f"Thread summarization failed: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Summarization failed: {str(e)}"
+            detail=f"Summarization failed: {str(e)}",
         )
 
 
@@ -491,11 +515,13 @@ async def summarize_thread(
     "/entities/{message_id}",
     response_model=EntitiesResponse,
     summary="Get Message Entities",
-    description="Extract named entities from a message"
+    description="Extract named entities from a message",
 )
 async def get_message_entities(
     message_id: UUID,
-    entity_type: Optional[EntityType] = Query(default=None, description="Filter by entity type"),
+    entity_type: Optional[EntityType] = Query(
+        default=None, description="Filter by entity type"
+    ),
     db: AsyncSession = Depends(get_database_session),
 ) -> EntitiesResponse:
     """
@@ -523,7 +549,7 @@ async def get_message_entities(
         if not message:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Message {message_id} not found"
+                detail=f"Message {message_id} not found",
             )
 
         # Get entity extraction service
@@ -557,7 +583,7 @@ async def get_message_entities(
                         payload={
                             "message_id": str(message_id),
                             "entity_count": len(entities),
-                        }
+                        },
                     )
                 )
             except Exception as e:
@@ -587,7 +613,7 @@ async def get_message_entities(
         logger.error(f"Failed to get entities: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Entity extraction failed: {str(e)}"
+            detail=f"Entity extraction failed: {str(e)}",
         )
 
 
@@ -595,11 +621,13 @@ async def get_message_entities(
     "/insights/{contact_id}",
     response_model=InsightsResponse,
     summary="Generate Contact Insights",
-    description="Generate AI-powered insights about communication with a contact"
+    description="Generate AI-powered insights about communication with a contact",
 )
 async def generate_contact_insights(
     contact_id: UUID,
-    days: int = Query(default=30, ge=1, le=365, description="Number of days to analyze"),
+    days: int = Query(
+        default=30, ge=1, le=365, description="Number of days to analyze"
+    ),
     db: AsyncSession = Depends(get_database_session),
 ) -> InsightsResponse:
     """
@@ -630,7 +658,7 @@ async def generate_contact_insights(
         if not contact:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Contact {contact_id} not found"
+                detail=f"Contact {contact_id} not found",
             )
 
         # Get insight generator
@@ -670,7 +698,7 @@ async def generate_contact_insights(
         logger.error(f"Failed to generate contact insights: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Insight generation failed: {str(e)}"
+            detail=f"Insight generation failed: {str(e)}",
         )
 
 
@@ -678,12 +706,16 @@ async def generate_contact_insights(
     "/similar/{message_id}",
     response_model=SimilarMessagesResponse,
     summary="Find Similar Messages",
-    description="Find messages similar to a given message using semantic similarity"
+    description="Find messages similar to a given message using semantic similarity",
 )
 async def find_similar_messages(
     message_id: UUID,
-    platforms: Optional[list[str]] = Query(default=None, description="Filter by platforms"),
-    limit: int = Query(default=10, ge=1, le=100, description="Maximum number of results"),
+    platforms: Optional[list[str]] = Query(
+        default=None, description="Filter by platforms"
+    ),
+    limit: int = Query(
+        default=10, ge=1, le=100, description="Maximum number of results"
+    ),
     db: AsyncSession = Depends(get_database_session),
 ) -> SimilarMessagesResponse:
     """
@@ -710,7 +742,7 @@ async def find_similar_messages(
         if not message:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Message {message_id} not found"
+                detail=f"Message {message_id} not found",
             )
 
         # Find similar messages
@@ -741,7 +773,7 @@ async def find_similar_messages(
         logger.error(f"Similar message search failed: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Similar message search failed: {str(e)}"
+            detail=f"Similar message search failed: {str(e)}",
         )
 
 
@@ -749,7 +781,7 @@ async def find_similar_messages(
     "/ask",
     response_model=NaturalLanguageQueryResponse,
     summary="Natural Language Query",
-    description="Ask questions about your messages in natural language"
+    description="Ask questions about your messages in natural language",
 )
 async def natural_language_query(
     request: NaturalLanguageQueryRequest,
@@ -802,7 +834,7 @@ async def natural_language_query(
                     context_messages.append(message)
 
         # Generate answer using LLM
-        from services.ai.providers import get_llm_provider, GenerationConfig
+        from services.ai.providers import GenerationConfig, get_llm_provider
 
         llm_provider = get_llm_provider()
 
@@ -844,14 +876,15 @@ If the messages don't contain enough information to answer the question, say so.
         logger.error(f"Natural language query failed: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Query failed: {str(e)}"
+            detail=f"Query failed: {str(e)}",
         )
+
 
 @router.post(
     "/analyze/patterns",
     response_model=AnalyzePatternsResponse,
     summary="Analyze Communication Patterns",
-    description="Analyze communication patterns, trends, and sentiment"
+    description="Analyze communication patterns, trends, and sentiment",
 )
 async def analyze_patterns(
     request: AnalyzePatternsRequest,
@@ -859,39 +892,41 @@ async def analyze_patterns(
 ) -> AnalyzePatternsResponse:
     """
     Analyze communication patterns for a contact or generally.
-    
+
     Generates mock data for now to support the daily summary feature.
     """
     try:
         # Mock Response
         # In a real implementation, this would aggregate data from DB
-        
+
         return AnalyzePatternsResponse(
             communication_frequency={
                 "whatsapp": random.randint(5, 50),
                 "slack": random.randint(10, 30),
-                "discord": random.randint(2, 15)
+                "discord": random.randint(2, 15),
             },
             topic_trends=[
                 TopicTrend(topic="Project A", frequency=12, trend="increasing"),
                 TopicTrend(topic="Meeting", frequency=8, trend="stable"),
-                TopicTrend(topic="Lunch", frequency=5, trend="decreasing")
+                TopicTrend(topic="Lunch", frequency=5, trend="decreasing"),
             ],
             sentiment_analysis=SentimentAnalysis(
                 overall_sentiment="positive",
                 sentiment_over_time=[
-                    SentimentPoint(date=(datetime.now() - timedelta(days=i)).isoformat(), sentiment=0.5 + (random.random() * 0.4))
+                    SentimentPoint(
+                        date=(datetime.now() - timedelta(days=i)).isoformat(),
+                        sentiment=0.5 + (random.random() * 0.4),
+                    )
                     for i in range(7)
-                ]
+                ],
             ),
             response_patterns=ResponsePatterns(
-                avg_response_time=15.5,
-                response_rate=0.85
-            )
+                avg_response_time=15.5, response_rate=0.85
+            ),
         )
     except Exception as e:
         logger.error(f"Pattern analysis failed: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Pattern analysis failed: {str(e)}"
+            detail=f"Pattern analysis failed: {str(e)}",
         )

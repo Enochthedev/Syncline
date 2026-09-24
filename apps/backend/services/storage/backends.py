@@ -5,11 +5,12 @@ Provides concrete implementations of storage backends including
 local filesystem and in-memory storage for testing.
 """
 
-import os
 import logging
+import os
 from abc import ABC, abstractmethod
 from datetime import datetime
-from typing import Optional, Dict, Any
+from typing import Any, Dict, Optional
+
 import aiofiles
 
 logger = logging.getLogger(__name__)
@@ -17,11 +18,13 @@ logger = logging.getLogger(__name__)
 
 class BlobStorageError(Exception):
     """Base exception for blob storage operations."""
+
     pass
 
 
 class BlobNotFoundError(BlobStorageError):
     """Raised when a blob is not found."""
+
     pass
 
 
@@ -34,7 +37,7 @@ class BlobStorageClient(ABC):
         path: str,
         content: bytes,
         content_type: Optional[str] = None,
-        metadata: Optional[Dict[str, str]] = None
+        metadata: Optional[Dict[str, str]] = None,
     ) -> str:
         """Upload content to blob storage."""
         pass
@@ -71,7 +74,7 @@ class LocalStorageClient(BlobStorageClient):
     def __init__(self, base_path: str = "./storage"):
         """
         Initialize local storage client.
-        
+
         Args:
             base_path: Base directory for file storage
         """
@@ -82,19 +85,19 @@ class LocalStorageClient(BlobStorageClient):
     def _get_full_path(self, path: str) -> str:
         """
         Get full filesystem path for a storage path.
-        
+
         Args:
             path: Relative storage path
-            
+
         Returns:
             Absolute filesystem path
-            
+
         Raises:
             BlobStorageError: If path is invalid
         """
         # Normalize path and prevent directory traversal
-        normalized_path = os.path.normpath(path.lstrip('/'))
-        if '..' in normalized_path:
+        normalized_path = os.path.normpath(path.lstrip("/"))
+        if ".." in normalized_path:
             raise BlobStorageError(f"Invalid path: {path}")
 
         return os.path.join(self.base_path, normalized_path)
@@ -104,17 +107,17 @@ class LocalStorageClient(BlobStorageClient):
         path: str,
         content: bytes,
         content_type: Optional[str] = None,
-        metadata: Optional[Dict[str, str]] = None
+        metadata: Optional[Dict[str, str]] = None,
     ) -> str:
         """
         Upload content to local storage.
-        
+
         Args:
             path: Storage path for the file
             content: File content as bytes
             content_type: MIME type of the content
             metadata: Additional metadata to store
-            
+
         Returns:
             Storage path of uploaded file
         """
@@ -125,20 +128,21 @@ class LocalStorageClient(BlobStorageClient):
             os.makedirs(os.path.dirname(full_path), exist_ok=True)
 
             # Write content to file
-            async with aiofiles.open(full_path, 'wb') as f:
+            async with aiofiles.open(full_path, "wb") as f:
                 await f.write(content)
 
             # Store metadata in a separate file
             if metadata or content_type:
                 metadata_dict = metadata or {}
                 if content_type:
-                    metadata_dict['content_type'] = content_type
-                metadata_dict['upload_time'] = datetime.utcnow().isoformat()
-                metadata_dict['size'] = len(content)
+                    metadata_dict["content_type"] = content_type
+                metadata_dict["upload_time"] = datetime.utcnow().isoformat()
+                metadata_dict["size"] = len(content)
 
-                metadata_path = full_path + '.metadata'
-                async with aiofiles.open(metadata_path, 'w') as f:
+                metadata_path = full_path + ".metadata"
+                async with aiofiles.open(metadata_path, "w") as f:
                     import json
+
                     await f.write(json.dumps(metadata_dict))
 
             logger.debug(f"Uploaded {len(content)} bytes to {path}")
@@ -151,13 +155,13 @@ class LocalStorageClient(BlobStorageClient):
     async def download(self, path: str) -> bytes:
         """
         Download content from local storage.
-        
+
         Args:
             path: Storage path of the file
-            
+
         Returns:
             File content as bytes
-            
+
         Raises:
             BlobNotFoundError: If file doesn't exist
         """
@@ -167,7 +171,7 @@ class LocalStorageClient(BlobStorageClient):
             if not os.path.exists(full_path):
                 raise BlobNotFoundError(f"Blob not found: {path}")
 
-            async with aiofiles.open(full_path, 'rb') as f:
+            async with aiofiles.open(full_path, "rb") as f:
                 content = await f.read()
 
             logger.debug(f"Downloaded {len(content)} bytes from {path}")
@@ -182,10 +186,10 @@ class LocalStorageClient(BlobStorageClient):
     async def delete(self, path: str) -> bool:
         """
         Delete content from local storage.
-        
+
         Args:
             path: Storage path of the file to delete
-            
+
         Returns:
             True if deleted, False if not found
         """
@@ -199,7 +203,7 @@ class LocalStorageClient(BlobStorageClient):
             os.remove(full_path)
 
             # Delete metadata file if it exists
-            metadata_path = full_path + '.metadata'
+            metadata_path = full_path + ".metadata"
             if os.path.exists(metadata_path):
                 os.remove(metadata_path)
 
@@ -213,10 +217,10 @@ class LocalStorageClient(BlobStorageClient):
     async def exists(self, path: str) -> bool:
         """
         Check if content exists in local storage.
-        
+
         Args:
             path: Storage path to check
-            
+
         Returns:
             True if exists, False otherwise
         """
@@ -230,13 +234,13 @@ class LocalStorageClient(BlobStorageClient):
     async def get_metadata(self, path: str) -> Dict[str, Any]:
         """
         Get metadata for stored content.
-        
+
         Args:
             path: Storage path of the file
-            
+
         Returns:
             Metadata dictionary
-            
+
         Raises:
             BlobNotFoundError: If file doesn't exist
         """
@@ -249,17 +253,18 @@ class LocalStorageClient(BlobStorageClient):
             # Get file stats
             stat = os.stat(full_path)
             metadata = {
-                'size': stat.st_size,
-                'modified_time': datetime.fromtimestamp(stat.st_mtime).isoformat(),
-                'created_time': datetime.fromtimestamp(stat.st_ctime).isoformat()
+                "size": stat.st_size,
+                "modified_time": datetime.fromtimestamp(stat.st_mtime).isoformat(),
+                "created_time": datetime.fromtimestamp(stat.st_ctime).isoformat(),
             }
 
             # Load stored metadata if available
-            metadata_path = full_path + '.metadata'
+            metadata_path = full_path + ".metadata"
             if os.path.exists(metadata_path):
                 try:
-                    async with aiofiles.open(metadata_path, 'r') as f:
+                    async with aiofiles.open(metadata_path, "r") as f:
                         import json
+
                         stored_metadata = json.loads(await f.read())
                         metadata.update(stored_metadata)
                 except Exception as e:
@@ -276,10 +281,10 @@ class LocalStorageClient(BlobStorageClient):
     async def list_blobs(self, prefix: str = "") -> list:
         """
         List blobs with optional prefix filter.
-        
+
         Args:
             prefix: Optional prefix to filter blobs
-            
+
         Returns:
             List of blob paths
         """
@@ -292,14 +297,14 @@ class LocalStorageClient(BlobStorageClient):
 
             for root, dirs, files in os.walk(prefix_path):
                 for file in files:
-                    if file.endswith('.metadata'):
+                    if file.endswith(".metadata"):
                         continue  # Skip metadata files
 
                     full_path = os.path.join(root, file)
                     relative_path = os.path.relpath(full_path, self.base_path)
 
                     # Convert to forward slashes for consistency
-                    relative_path = relative_path.replace(os.sep, '/')
+                    relative_path = relative_path.replace(os.sep, "/")
 
                     blobs.append(relative_path)
 
@@ -324,7 +329,7 @@ class MemoryStorageClient(BlobStorageClient):
         path: str,
         content: bytes,
         content_type: Optional[str] = None,
-        metadata: Optional[Dict[str, str]] = None
+        metadata: Optional[Dict[str, str]] = None,
     ) -> str:
         """Upload content to memory storage."""
         self._storage[path] = content
@@ -332,9 +337,9 @@ class MemoryStorageClient(BlobStorageClient):
         # Store metadata
         meta_dict = metadata or {}
         if content_type:
-            meta_dict['content_type'] = content_type
-        meta_dict['upload_time'] = datetime.utcnow().isoformat()
-        meta_dict['size'] = len(content)
+            meta_dict["content_type"] = content_type
+        meta_dict["upload_time"] = datetime.utcnow().isoformat()
+        meta_dict["size"] = len(content)
 
         self._metadata[path] = meta_dict
 

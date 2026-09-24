@@ -15,18 +15,18 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, Field
-from sqlalchemy import select, func, and_
+from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.dependencies import get_database_session
-from db.models.message import Message
-from db.models.raw_message import RawMessage
-from db.models.platform_connection import PlatformConnection
-from db.models.collection_job import CollectionJob, CollectionJobStatus
-from db.models.entity import Entity
-from db.models.embedding import Embedding
-from db.models.summary import Summary
 from db.models.attachment import Attachment
+from db.models.collection_job import CollectionJob, CollectionJobStatus
+from db.models.embedding import Embedding
+from db.models.entity import Entity
+from db.models.message import Message
+from db.models.platform_connection import PlatformConnection
+from db.models.raw_message import RawMessage
+from db.models.summary import Summary
 from services.realtime.websocket_manager import get_websocket_manager
 
 logger = logging.getLogger(__name__)
@@ -54,8 +54,12 @@ class SystemStats(BaseModel):
     # Platform stats
     total_connections: int = Field(..., description="Total platform connections")
     active_connections: int = Field(..., description="Active platform connections")
-    connections_by_platform: dict[str, int] = Field(..., description="Connections per platform")
-    messages_by_platform: dict[str, int] = Field(..., description="Messages per platform")
+    connections_by_platform: dict[str, int] = Field(
+        ..., description="Connections per platform"
+    )
+    messages_by_platform: dict[str, int] = Field(
+        ..., description="Messages per platform"
+    )
 
     # Collection stats
     total_collection_jobs: int = Field(..., description="Total collection jobs")
@@ -71,14 +75,22 @@ class SystemStats(BaseModel):
 
     # Storage stats
     total_attachments: int = Field(..., description="Total attachments")
-    total_storage_bytes: int = Field(..., description="Total attachment storage in bytes")
+    total_storage_bytes: int = Field(
+        ..., description="Total attachment storage in bytes"
+    )
 
     # Real-time stats
-    active_websocket_connections: int = Field(..., description="Active WebSocket connections")
+    active_websocket_connections: int = Field(
+        ..., description="Active WebSocket connections"
+    )
 
     # Timestamps
-    oldest_message: datetime | None = Field(None, description="Oldest message timestamp")
-    newest_message: datetime | None = Field(None, description="Newest message timestamp")
+    oldest_message: datetime | None = Field(
+        None, description="Oldest message timestamp"
+    )
+    newest_message: datetime | None = Field(
+        None, description="Newest message timestamp"
+    )
     last_updated: datetime = Field(..., description="Stats last updated timestamp")
 
 
@@ -103,7 +115,7 @@ class PlatformStats(BaseModel):
     "",
     response_model=SystemStats,
     summary="Get System Statistics",
-    description="Get comprehensive system-wide statistics"
+    description="Get comprehensive system-wide statistics",
 )
 async def get_system_stats(
     db: AsyncSession = Depends(get_database_session),
@@ -156,7 +168,8 @@ async def get_system_stats(
         # Processing rate
         processing_rate = (
             (total_messages / total_raw_messages * 100)
-            if total_raw_messages > 0 else 0.0
+            if total_raw_messages > 0
+            else 0.0
         )
 
         # Connection stats
@@ -172,8 +185,7 @@ async def get_system_stats(
 
         # Connections by platform
         conn_by_platform_query = select(
-            PlatformConnection.platform,
-            func.count(PlatformConnection.id)
+            PlatformConnection.platform, func.count(PlatformConnection.id)
         ).group_by(PlatformConnection.platform)
         conn_by_platform_result = await db.execute(conn_by_platform_query)
         connections_by_platform = {
@@ -182,13 +194,10 @@ async def get_system_stats(
 
         # Messages by platform
         msg_by_platform_query = select(
-            Message.platform,
-            func.count(Message.id)
+            Message.platform, func.count(Message.id)
         ).group_by(Message.platform)
         msg_by_platform_result = await db.execute(msg_by_platform_query)
-        messages_by_platform = {
-            row[0]: row[1] for row in msg_by_platform_result.all()
-        }
+        messages_by_platform = {row[0]: row[1] for row in msg_by_platform_result.all()}
 
         # Collection job stats
         total_jobs_query = select(func.count(CollectionJob.id))
@@ -228,8 +237,7 @@ async def get_system_stats(
 
         # AI processing rate (messages with embeddings / total messages)
         ai_processing_rate = (
-            (total_embeddings / total_messages * 100)
-            if total_messages > 0 else 0.0
+            (total_embeddings / total_messages * 100) if total_messages > 0 else 0.0
         )
 
         # Storage stats
@@ -237,9 +245,7 @@ async def get_system_stats(
         total_attachments_result = await db.execute(total_attachments_query)
         total_attachments = total_attachments_result.scalar() or 0
 
-        total_storage_query = select(
-            func.coalesce(func.sum(Attachment.size_bytes), 0)
-        )
+        total_storage_query = select(func.coalesce(func.sum(Attachment.size_bytes), 0))
         total_storage_result = await db.execute(total_storage_query)
         total_storage_bytes = total_storage_result.scalar() or 0
 
@@ -291,7 +297,7 @@ async def get_system_stats(
     "/platform/{platform}",
     response_model=PlatformStats,
     summary="Get Platform Statistics",
-    description="Get statistics for a specific platform"
+    description="Get statistics for a specific platform",
 )
 async def get_platform_stats(
     platform: str,
@@ -320,7 +326,7 @@ async def get_platform_stats(
         active_conn_query = select(func.count(PlatformConnection.id)).where(
             and_(
                 PlatformConnection.platform == platform,
-                PlatformConnection.status == "active"
+                PlatformConnection.status == "active",
             )
         )
         active_conn_result = await db.execute(active_conn_query)
@@ -336,10 +342,7 @@ async def get_platform_stats(
         # Messages in last 24h
         last_24h = datetime.utcnow() - timedelta(hours=24)
         msg_24h_query = select(func.count(Message.id)).where(
-            and_(
-                Message.platform == platform,
-                Message.collected_at >= last_24h
-            )
+            and_(Message.platform == platform, Message.collected_at >= last_24h)
         )
         msg_24h_result = await db.execute(msg_24h_query)
         messages_last_24h = msg_24h_result.scalar() or 0

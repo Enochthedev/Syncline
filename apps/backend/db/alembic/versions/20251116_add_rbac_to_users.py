@@ -5,13 +5,14 @@ Revises: 2a3b4c5d6e7f
 Create Date: 2025-11-16 20:30:00.000000
 
 """
-from alembic import op
+
 import sqlalchemy as sa
+from alembic import op
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision = '3b4c5d6e7f8g'
-down_revision = '2a3b4c5d6e7f'
+revision = "3b4c5d6e7f8g"
+down_revision = "2a3b4c5d6e7f"
 branch_labels = None
 depends_on = None
 
@@ -26,18 +27,16 @@ def upgrade() -> None:
     """
     # Add role column
     op.add_column(
-        'users',
-        sa.Column('role', sa.String(50), nullable=False, server_default='user')
+        "users", sa.Column("role", sa.String(50), nullable=False, server_default="user")
     )
 
     # Add permissions column
     op.add_column(
-        'users',
-        sa.Column('permissions', postgresql.ARRAY(sa.String), nullable=True)
+        "users", sa.Column("permissions", postgresql.ARRAY(sa.String), nullable=True)
     )
 
     # Create index on role
-    op.create_index('ix_users_role', 'users', ['role'])
+    op.create_index("ix_users_role", "users", ["role"])
 
 
 def downgrade() -> None:
@@ -45,8 +44,8 @@ def downgrade() -> None:
     Remove RBAC fields from users table.
     """
     # Drop index
-    op.drop_index('ix_users_role', table_name='users')
+    op.drop_index("ix_users_role", table_name="users")
 
     # Drop columns
-    op.drop_column('users', 'permissions')
-    op.drop_column('users', 'role')
+    op.drop_column("users", "permissions")
+    op.drop_column("users", "role")

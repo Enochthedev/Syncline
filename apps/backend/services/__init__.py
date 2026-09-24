@@ -9,8 +9,8 @@ This package contains business logic and orchestration services:
 - Attachment handling
 """
 
-from .event_bus import EventBus, get_event_bus
 from .attachment_handler import AttachmentHandler, get_default_attachment_handler
+from .event_bus import EventBus, get_event_bus
 
 __all__ = [
     "EventBus",

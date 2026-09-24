@@ -13,7 +13,7 @@ from typing import Optional
 from uuid import UUID
 
 from fastapi import Depends, HTTPException, status
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.dependencies import get_database_session
@@ -111,8 +111,7 @@ async def get_current_active_user(
     """
     if not current_user.is_active:
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Inactive user"
+            status_code=status.HTTP_403_FORBIDDEN, detail="Inactive user"
         )
     return current_user
 
@@ -134,8 +133,7 @@ async def get_current_admin_user(
     """
     if current_user.role != "admin":
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not enough permissions"
+            status_code=status.HTTP_403_FORBIDDEN, detail="Not enough permissions"
         )
     return current_user
 
@@ -155,11 +153,12 @@ def require_role(*allowed_roles: str):
         async def admin_endpoint():
             ...
     """
+
     async def role_checker(current_user: User = Depends(get_current_user)) -> User:
         if current_user.role not in allowed_roles:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Required role: {', '.join(allowed_roles)}"
+                detail=f"Required role: {', '.join(allowed_roles)}",
             )
         return current_user
 
@@ -184,8 +183,9 @@ def require_permission(*required_permissions: str):
         async def create_message():
             ...
     """
+
     async def permission_checker(
-        current_user: User = Depends(get_current_user)
+        current_user: User = Depends(get_current_user),
     ) -> User:
         # Admin has all permissions
         if current_user.role == "admin":
@@ -198,7 +198,7 @@ def require_permission(*required_permissions: str):
             if permission not in user_permissions:
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
-                    detail=f"Missing permission: {permission}"
+                    detail=f"Missing permission: {permission}",
                 )
 
         return current_user

@@ -26,6 +26,7 @@ logger = logging.getLogger(__name__)
 
 class ModelType(str, Enum):
     """Types of AI models."""
+
     CHAT = "chat"
     EMBEDDING = "embedding"
     COMPLETION = "completion"
@@ -33,6 +34,7 @@ class ModelType(str, Enum):
 
 class ModelInfo(BaseModel):
     """Information about an AI model."""
+
     name: str
     type: ModelType
     size: Optional[str] = None
@@ -44,6 +46,7 @@ class ModelInfo(BaseModel):
 
 class GenerationConfig(BaseModel):
     """Configuration for text generation."""
+
     temperature: float = Field(default=0.1, ge=0.0, le=2.0)
     max_tokens: int = Field(default=1000, ge=1)
     top_p: float = Field(default=0.9, ge=0.0, le=1.0)
@@ -55,14 +58,14 @@ class GenerationConfig(BaseModel):
 class LLMProvider(ABC):
     """
     Abstract base class for LLM providers.
-    
+
     Defines the interface that all LLM providers must implement.
     """
-    
+
     def __init__(self, base_url: str, timeout: int = 120, max_retries: int = 3):
         """
         Initialize the LLM provider.
-        
+
         Args:
             base_url: Base URL for the provider API
             timeout: Request timeout in seconds
@@ -72,19 +75,19 @@ class LLMProvider(ABC):
         self.timeout = timeout
         self.max_retries = max_retries
         self._session: Optional[aiohttp.ClientSession] = None
-    
+
     async def _get_session(self) -> aiohttp.ClientSession:
         """Get or create aiohttp session."""
         if self._session is None or self._session.closed:
             timeout = aiohttp.ClientTimeout(total=self.timeout)
             self._session = aiohttp.ClientSession(timeout=timeout)
         return self._session
-    
+
     async def close(self):
         """Close the HTTP session."""
         if self._session and not self._session.closed:
             await self._session.close()
-    
+
     @abstractmethod
     async def generate(
         self,
@@ -94,17 +97,17 @@ class LLMProvider(ABC):
     ) -> str:
         """
         Generate text from a prompt.
-        
+
         Args:
             prompt: Input prompt
             model: Model name (uses default if not specified)
             config: Generation configuration
-            
+
         Returns:
             Generated text
         """
         pass
-    
+
     @abstractmethod
     async def chat(
         self,
@@ -114,17 +117,17 @@ class LLMProvider(ABC):
     ) -> str:
         """
         Generate a chat response.
-        
+
         Args:
             messages: List of message dicts with 'role' and 'content'
             model: Model name (uses default if not specified)
             config: Generation configuration
-            
+
         Returns:
             Generated response
         """
         pass
-    
+
     @abstractmethod
     async def embed(
         self,
@@ -133,44 +136,44 @@ class LLMProvider(ABC):
     ) -> list[list[float]]:
         """
         Generate embeddings for text.
-        
+
         Args:
             text: Single text or list of texts
             model: Embedding model name (uses default if not specified)
-            
+
         Returns:
             List of embedding vectors
         """
         pass
-    
+
     @abstractmethod
     async def list_models(self) -> list[ModelInfo]:
         """
         List available models.
-        
+
         Returns:
             List of model information
         """
         pass
-    
+
     @abstractmethod
     async def pull_model(self, model: str) -> bool:
         """
         Download/pull a model.
-        
+
         Args:
             model: Model name to download
-            
+
         Returns:
             True if successful
         """
         pass
-    
+
     @abstractmethod
     async def health_check(self) -> bool:
         """
         Check if the provider is healthy and accessible.
-        
+
         Returns:
             True if healthy
         """
@@ -180,10 +183,10 @@ class LLMProvider(ABC):
 class OpenRouterProvider(LLMProvider):
     """
     OpenRouter LLM provider implementation.
-    
+
     Provides unified access to multiple LLM providers through OpenRouter.
     """
-    
+
     def __init__(
         self,
         api_key: Optional[str] = None,
@@ -194,7 +197,7 @@ class OpenRouterProvider(LLMProvider):
     ):
         """
         Initialize OpenRouter provider.
-        
+
         Args:
             api_key: OpenRouter API key
             base_url: OpenRouter API base URL
@@ -209,15 +212,15 @@ class OpenRouterProvider(LLMProvider):
         )
         self.api_key = api_key or settings.OPENROUTER_API_KEY
         self.default_chat_model = default_chat_model or settings.DEFAULT_CHAT_MODEL
-        
+
         if not self.api_key:
             logger.warning("OpenRouter API key not provided")
-        
+
         logger.info(
             f"Initialized OpenRouter provider at {self.base_url} "
             f"(chat: {self.default_chat_model})"
         )
-    
+
     async def _get_session(self) -> aiohttp.ClientSession:
         """Get or create aiohttp session with OpenRouter headers."""
         if self._session is None or self._session.closed:
@@ -228,12 +231,9 @@ class OpenRouterProvider(LLMProvider):
                 "HTTP-Referer": "https://github.com/your-org/remi",  # Optional
                 "X-Title": "R.E.M.I Backend",  # Optional
             }
-            self._session = aiohttp.ClientSession(
-                timeout=timeout,
-                headers=headers
-            )
+            self._session = aiohttp.ClientSession(timeout=timeout, headers=headers)
         return self._session
-    
+
     async def _request(
         self,
         method: str,
@@ -242,18 +242,18 @@ class OpenRouterProvider(LLMProvider):
     ) -> Any:
         """
         Make an HTTP request to OpenRouter API with retries.
-        
+
         Args:
             method: HTTP method
             endpoint: API endpoint
             json_data: JSON request body
-            
+
         Returns:
             Response data
         """
         session = await self._get_session()
         url = f"{self.base_url}/{endpoint.lstrip('/')}"
-        
+
         for attempt in range(self.max_retries):
             try:
                 async with session.request(
@@ -263,19 +263,23 @@ class OpenRouterProvider(LLMProvider):
                 ) as response:
                     response.raise_for_status()
                     return await response.json()
-                    
+
             except aiohttp.ClientError as e:
                 if attempt == self.max_retries - 1:
-                    logger.error(f"OpenRouter request failed after {self.max_retries} attempts: {e}")
+                    logger.error(
+                        f"OpenRouter request failed after {self.max_retries} attempts: {e}"
+                    )
                     raise
-                
+
                 # Exponential backoff
-                wait_time = 2 ** attempt
-                logger.warning(f"OpenRouter request failed (attempt {attempt + 1}), retrying in {wait_time}s: {e}")
+                wait_time = 2**attempt
+                logger.warning(
+                    f"OpenRouter request failed (attempt {attempt + 1}), retrying in {wait_time}s: {e}"
+                )
                 await asyncio.sleep(wait_time)
-        
+
         raise RuntimeError("Max retries exceeded")
-    
+
     async def generate(
         self,
         prompt: str,
@@ -285,11 +289,11 @@ class OpenRouterProvider(LLMProvider):
         """Generate text from a prompt using OpenRouter."""
         model = model or self.default_chat_model
         config = config or GenerationConfig()
-        
+
         # Convert prompt to messages format
         messages = [{"role": "user", "content": prompt}]
         return await self.chat(messages, model, config)
-    
+
     async def chat(
         self,
         messages: list[dict[str, str]],
@@ -299,7 +303,7 @@ class OpenRouterProvider(LLMProvider):
         """Generate a chat response using OpenRouter."""
         model = model or self.default_chat_model
         config = config or GenerationConfig()
-        
+
         request_data = {
             "model": model,
             "messages": messages,
@@ -308,21 +312,21 @@ class OpenRouterProvider(LLMProvider):
             "top_p": config.top_p,
             "stream": config.stream,
         }
-        
+
         if config.stop:
             request_data["stop"] = config.stop
-        
+
         logger.debug(f"Generating chat response with model {model}")
         response = await self._request("POST", "/chat/completions", request_data)
-        
+
         choices = response.get("choices", [])
         if not choices:
             logger.warning("No choices in OpenRouter response")
             return ""
-        
+
         message = choices[0].get("message", {})
         return message.get("content", "")
-    
+
     async def embed(
         self,
         text: str | list[str],
@@ -330,14 +334,14 @@ class OpenRouterProvider(LLMProvider):
     ) -> list[list[float]]:
         """
         Generate embeddings using OpenRouter.
-        
+
         Note: Not all models on OpenRouter support embeddings.
         Falls back to local embedding model if available.
         """
         # OpenRouter doesn't have a standard embeddings endpoint
         # Fall back to local embedding service
         logger.warning("OpenRouter embeddings not supported, falling back to local")
-        
+
         # Try to use Ollama for embeddings
         try:
             ollama = OllamaProvider()
@@ -347,13 +351,13 @@ class OpenRouterProvider(LLMProvider):
             # Return empty embeddings as fallback
             texts = [text] if isinstance(text, str) else text
             return [[] for _ in texts]
-    
+
     async def list_models(self) -> list[ModelInfo]:
         """List available OpenRouter models."""
         try:
             response = await self._request("GET", "/models")
             models_data = response.get("data", [])
-            
+
             models = []
             for model_data in models_data:
                 model_info = ModelInfo(
@@ -362,27 +366,31 @@ class OpenRouterProvider(LLMProvider):
                     size=None,  # Not provided by OpenRouter
                     parameters=None,
                     quantization=None,
-                    family=model_data.get("id", "").split("/")[0] if "/" in model_data.get("id", "") else None,
+                    family=(
+                        model_data.get("id", "").split("/")[0]
+                        if "/" in model_data.get("id", "")
+                        else None
+                    ),
                     available=True,
                 )
                 models.append(model_info)
-            
+
             logger.info(f"Found {len(models)} OpenRouter models")
             return models
-            
+
         except Exception as e:
             logger.error(f"Failed to list OpenRouter models: {e}")
             return []
-    
+
     async def pull_model(self, model: str) -> bool:
         """
         Pull/download a model.
-        
+
         OpenRouter models are always available, no pulling needed.
         """
         logger.info(f"OpenRouter model {model} is always available")
         return True
-    
+
     async def health_check(self) -> bool:
         """Check if OpenRouter is accessible."""
         try:
@@ -398,10 +406,10 @@ class OpenRouterProvider(LLMProvider):
 class OllamaProvider(LLMProvider):
     """
     Ollama LLM provider implementation.
-    
+
     Provides local-first AI inference using Ollama.
     """
-    
+
     def __init__(
         self,
         base_url: Optional[str] = None,
@@ -412,7 +420,7 @@ class OllamaProvider(LLMProvider):
     ):
         """
         Initialize Ollama provider.
-        
+
         Args:
             base_url: Ollama API base URL
             timeout: Request timeout
@@ -433,7 +441,7 @@ class OllamaProvider(LLMProvider):
             f"Initialized Ollama provider at {self.base_url} "
             f"(chat: {self.default_chat_model}, embed: {self.default_embedding_model})"
         )
-    
+
     async def _request(
         self,
         method: str,
@@ -443,19 +451,19 @@ class OllamaProvider(LLMProvider):
     ) -> Any:
         """
         Make an HTTP request to Ollama API with retries.
-        
+
         Args:
             method: HTTP method
             endpoint: API endpoint
             json_data: JSON request body
             stream: Whether to stream the response
-            
+
         Returns:
             Response data
         """
         session = await self._get_session()
         url = f"{self.base_url}/{endpoint.lstrip('/')}"
-        
+
         for attempt in range(self.max_retries):
             try:
                 async with session.request(
@@ -464,25 +472,29 @@ class OllamaProvider(LLMProvider):
                     json=json_data,
                 ) as response:
                     response.raise_for_status()
-                    
+
                     if stream:
                         # For streaming responses, return the response object
                         return response
-                    
+
                     return await response.json()
-                    
+
             except aiohttp.ClientError as e:
                 if attempt == self.max_retries - 1:
-                    logger.error(f"Ollama request failed after {self.max_retries} attempts: {e}")
+                    logger.error(
+                        f"Ollama request failed after {self.max_retries} attempts: {e}"
+                    )
                     raise
-                
+
                 # Exponential backoff
-                wait_time = 2 ** attempt
-                logger.warning(f"Ollama request failed (attempt {attempt + 1}), retrying in {wait_time}s: {e}")
+                wait_time = 2**attempt
+                logger.warning(
+                    f"Ollama request failed (attempt {attempt + 1}), retrying in {wait_time}s: {e}"
+                )
                 await asyncio.sleep(wait_time)
-        
+
         raise RuntimeError("Max retries exceeded")
-    
+
     async def generate(
         self,
         prompt: str,
@@ -492,7 +504,7 @@ class OllamaProvider(LLMProvider):
         """Generate text from a prompt using Ollama."""
         model = model or self.default_chat_model
         config = config or GenerationConfig()
-        
+
         request_data = {
             "model": model,
             "prompt": prompt,
@@ -502,17 +514,17 @@ class OllamaProvider(LLMProvider):
                 "num_predict": config.max_tokens,
                 "top_p": config.top_p,
                 "top_k": config.top_k,
-            }
+            },
         }
-        
+
         if config.stop:
             request_data["options"]["stop"] = config.stop
-        
+
         logger.debug(f"Generating text with model {model}")
         response = await self._request("POST", "/api/generate", request_data)
-        
+
         return response.get("response", "")
-    
+
     async def chat(
         self,
         messages: list[dict[str, str]],
@@ -522,7 +534,7 @@ class OllamaProvider(LLMProvider):
         """Generate a chat response using Ollama."""
         model = model or self.default_chat_model
         config = config or GenerationConfig()
-        
+
         request_data = {
             "model": model,
             "messages": messages,
@@ -532,18 +544,18 @@ class OllamaProvider(LLMProvider):
                 "num_predict": config.max_tokens,
                 "top_p": config.top_p,
                 "top_k": config.top_k,
-            }
+            },
         }
-        
+
         if config.stop:
             request_data["options"]["stop"] = config.stop
-        
+
         logger.debug(f"Generating chat response with model {model}")
         response = await self._request("POST", "/api/chat", request_data)
-        
+
         message = response.get("message", {})
         return message.get("content", "")
-    
+
     async def embed(
         self,
         text: str | list[str],
@@ -551,31 +563,31 @@ class OllamaProvider(LLMProvider):
     ) -> list[list[float]]:
         """Generate embeddings using Ollama."""
         model = model or self.default_embedding_model
-        
+
         # Convert single text to list
         texts = [text] if isinstance(text, str) else text
-        
+
         embeddings = []
         for txt in texts:
             request_data = {
                 "model": model,
                 "prompt": txt,
             }
-            
+
             logger.debug(f"Generating embedding with model {model}")
             response = await self._request("POST", "/api/embeddings", request_data)
-            
+
             embedding = response.get("embedding", [])
             embeddings.append(embedding)
-        
+
         return embeddings
-    
+
     async def list_models(self) -> list[ModelInfo]:
         """List available Ollama models."""
         try:
             response = await self._request("GET", "/api/tags")
             models_data = response.get("models", [])
-            
+
             models = []
             for model_data in models_data:
                 model_info = ModelInfo(
@@ -583,38 +595,40 @@ class OllamaProvider(LLMProvider):
                     type=ModelType.CHAT,  # Default to chat, could be refined
                     size=model_data.get("size"),
                     parameters=model_data.get("details", {}).get("parameter_size"),
-                    quantization=model_data.get("details", {}).get("quantization_level"),
+                    quantization=model_data.get("details", {}).get(
+                        "quantization_level"
+                    ),
                     family=model_data.get("details", {}).get("family"),
                     available=True,
                 )
                 models.append(model_info)
-            
+
             logger.info(f"Found {len(models)} Ollama models")
             return models
-            
+
         except Exception as e:
             logger.error(f"Failed to list Ollama models: {e}")
             return []
-    
+
     async def pull_model(self, model: str) -> bool:
         """
         Pull/download an Ollama model.
-        
+
         Note: This is a long-running operation that streams progress.
         """
         try:
             request_data = {"name": model, "stream": False}
-            
+
             logger.info(f"Pulling Ollama model: {model}")
             await self._request("POST", "/api/pull", request_data)
-            
+
             logger.info(f"Successfully pulled model: {model}")
             return True
-            
+
         except Exception as e:
             logger.error(f"Failed to pull model {model}: {e}")
             return False
-    
+
     async def health_check(self) -> bool:
         """Check if Ollama is accessible."""
         try:
@@ -631,20 +645,20 @@ class OllamaProvider(LLMProvider):
 def get_llm_provider(provider_name: Optional[str] = None) -> LLMProvider:
     """
     Get an LLM provider instance.
-    
+
     Args:
         provider_name: Provider name ('openrouter', 'ollama', 'openai', 'anthropic')
                       Uses DEFAULT_LLM_PROVIDER from settings if not specified
-    
+
     Returns:
         LLM provider instance
-    
+
     Raises:
         ValueError: If provider name is not supported
     """
     provider_name = provider_name or settings.DEFAULT_LLM_PROVIDER
     provider_name = provider_name.lower()
-    
+
     if provider_name == "openrouter":
         return OpenRouterProvider()
     elif provider_name == "ollama":

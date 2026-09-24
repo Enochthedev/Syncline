@@ -11,14 +11,14 @@ Improvements over base connector:
 
 import asyncio
 import logging
-from typing import Optional, Dict, Any, List
 from datetime import datetime
+from typing import Any, Dict, List, Optional
 
 from integrations.whatsapp_connector import (
-    WhatsAppConnector,
-    MatrixWhatsAppClient,
     BridgeStatus,
     ConnectionError,
+    MatrixWhatsAppClient,
+    WhatsAppConnector,
 )
 
 logger = logging.getLogger(__name__)
@@ -41,7 +41,7 @@ class EnhancedMatrixWhatsAppClient(MatrixWhatsAppClient):
         wait_for_response: bool = True,
         max_attempts: int = 15,  # Increased from 5
         initial_delay: float = 1.0,
-        max_delay: float = 3.0
+        max_delay: float = 3.0,
     ) -> Optional[Dict[str, Any]]:
         """
         Send a command to the mautrix-whatsapp bridge bot with enhanced retry logic.
@@ -122,7 +122,7 @@ class EnhancedMatrixWhatsAppClient(MatrixWhatsAppClient):
                             "scan the qr",
                             "not logged in",
                             "you're not logged in",
-                            "use the login command"
+                            "use the login command",
                         ]
                         if any(pattern in body.lower() for pattern in skip_patterns):
                             logger.debug(f"[BRIDGE] Skipping informational notice")
@@ -133,7 +133,9 @@ class EnhancedMatrixWhatsAppClient(MatrixWhatsAppClient):
                     return msg
 
             except Exception as e:
-                logger.warning(f"[BRIDGE] Error fetching messages on attempt {attempt + 1}: {e}")
+                logger.warning(
+                    f"[BRIDGE] Error fetching messages on attempt {attempt + 1}: {e}"
+                )
                 continue
 
         logger.warning(
@@ -171,18 +173,18 @@ class EnhancedMatrixWhatsAppClient(MatrixWhatsAppClient):
                 # Try to get room name and metadata
                 room_info = await self._get_room_info(room_id)
                 rooms.append(room_info)
-                logger.debug(f"[ROOMS] Added room: {room_id} - {room_info.get('name', 'Unknown')}")
+                logger.debug(
+                    f"[ROOMS] Added room: {room_id} - {room_info.get('name', 'Unknown')}"
+                )
 
             except Exception as e:
                 logger.warning(f"[ROOMS] Failed to get info for room {room_id}: {e}")
                 # Still add the room with minimal info
-                rooms.append({
-                    "room_id": room_id,
-                    "name": room_id,
-                    "is_group": False
-                })
+                rooms.append({"room_id": room_id, "name": room_id, "is_group": False})
 
-        logger.info(f"[ROOMS] Found {len(rooms)} WhatsApp chat rooms (excluding management)")
+        logger.info(
+            f"[ROOMS] Found {len(rooms)} WhatsApp chat rooms (excluding management)"
+        )
         return rooms
 
     async def _get_room_info(self, room_id: str) -> Dict[str, Any]:
@@ -222,16 +224,12 @@ class EnhancedMatrixWhatsAppClient(MatrixWhatsAppClient):
                 "room_id": room_id,
                 "name": room_name,
                 "is_group": is_group,
-                "topic": topic
+                "topic": topic,
             }
 
         except Exception as e:
             logger.debug(f"Failed to get detailed room info for {room_id}: {e}")
-            return {
-                "room_id": room_id,
-                "name": room_id,
-                "is_group": False
-            }
+            return {"room_id": room_id, "name": room_id, "is_group": False}
 
     async def get_bridge_status(self) -> BridgeStatus:
         """
@@ -273,7 +271,8 @@ class EnhancedMatrixWhatsAppClient(MatrixWhatsAppClient):
                 # Check for connected status
                 if "CONNECTED" in body.upper():
                     import re
-                    phone_match = re.search(r'\+\d+', body)
+
+                    phone_match = re.search(r"\+\d+", body)
                     phone = phone_match.group() if phone_match else None
                     logger.info(f"[STATUS] Connected with phone: {phone}")
                     return BridgeStatus(
@@ -313,14 +312,12 @@ class EnhancedWhatsAppConnector(WhatsAppConnector):
         if self._client is None:
             self._client = EnhancedMatrixWhatsAppClient(
                 homeserver_url=self.credentials.get(
-                    "matrix_homeserver_url",
-                    "http://localhost:8008"
+                    "matrix_homeserver_url", "http://localhost:8008"
                 ),
                 access_token=self.credentials.get("matrix_access_token", ""),
                 user_id=self.credentials.get("matrix_user_id", ""),
                 bridge_bot=self.credentials.get(
-                    "bridge_bot_id",
-                    "@whatsappbot:localhost"
+                    "bridge_bot_id", "@whatsappbot:localhost"
                 ),
             )
         return self._client
@@ -345,8 +342,7 @@ class EnhancedWhatsAppConnector(WhatsAppConnector):
             logger.info("[SYNC] Syncing WhatsApp contacts...")
             try:
                 contacts_response = await client.send_bridge_command(
-                    "!wa sync contacts-with-avatars",
-                    max_attempts=10
+                    "!wa sync contacts-with-avatars", max_attempts=10
                 )
                 if contacts_response:
                     contacts_body = contacts_response.get("content", {}).get("body", "")
@@ -366,8 +362,7 @@ class EnhancedWhatsAppConnector(WhatsAppConnector):
             logger.info("[SYNC] Syncing WhatsApp groups...")
             try:
                 groups_response = await client.send_bridge_command(
-                    "!wa sync groups",
-                    max_attempts=10
+                    "!wa sync groups", max_attempts=10
                 )
                 if groups_response:
                     groups_body = groups_response.get("content", {}).get("body", "")
@@ -386,8 +381,7 @@ class EnhancedWhatsAppConnector(WhatsAppConnector):
             logger.info("[SYNC] Syncing WhatsApp app state...")
             try:
                 appstate_response = await client.send_bridge_command(
-                    "!wa sync appstate",
-                    max_attempts=10
+                    "!wa sync appstate", max_attempts=10
                 )
                 if appstate_response:
                     appstate_body = appstate_response.get("content", {}).get("body", "")
@@ -418,19 +412,24 @@ class EnhancedWhatsAppConnector(WhatsAppConnector):
 
                     # Get recent messages to trigger backfill
                     messages = await client.get_room_messages(room_id, limit=10)
-                    backfill_results.append({
-                        "room_id": room_id,
-                        "room_name": room_info.get("name", "Unknown"),
-                        "messages_found": len(messages)
-                    })
-                    logger.debug(f"[SYNC] Room {room_id} has {len(messages)} recent messages")
+                    backfill_results.append(
+                        {
+                            "room_id": room_id,
+                            "room_name": room_info.get("name", "Unknown"),
+                            "messages_found": len(messages),
+                        }
+                    )
+                    logger.debug(
+                        f"[SYNC] Room {room_id} has {len(messages)} recent messages"
+                    )
 
                 except Exception as e:
-                    logger.warning(f"[SYNC] Failed to backfill room {room_info.get('room_id')}: {e}")
-                    backfill_results.append({
-                        "room_id": room_info.get("room_id"),
-                        "error": str(e)
-                    })
+                    logger.warning(
+                        f"[SYNC] Failed to backfill room {room_info.get('room_id')}: {e}"
+                    )
+                    backfill_results.append(
+                        {"room_id": room_info.get("room_id"), "error": str(e)}
+                    )
 
             results["backfill"] = backfill_results
 
@@ -438,13 +437,15 @@ class EnhancedWhatsAppConnector(WhatsAppConnector):
                 "success": True,
                 "message": f"Sync completed. Found {results.get('rooms_found', 0)} rooms.",
                 "details": results,
-                "action": "comprehensive_sync"
+                "action": "comprehensive_sync",
             }
 
         except Exception as e:
-            logger.error(f"[SYNC] Failed to sync all WhatsApp chats: {e}", exc_info=True)
+            logger.error(
+                f"[SYNC] Failed to sync all WhatsApp chats: {e}", exc_info=True
+            )
             return {
                 "success": False,
                 "message": f"Comprehensive sync failed: {str(e)}",
-                "details": results
+                "details": results,
             }

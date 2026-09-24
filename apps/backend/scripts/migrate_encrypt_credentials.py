@@ -18,8 +18,9 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from sqlalchemy import select
-from db.session import get_session
+
 from db.models.platform_connection import PlatformConnection
+from db.session import get_session
 from services.encryption_service import get_encryption_service
 
 

@@ -96,12 +96,14 @@ class WebSocketConnection:
             True if message matches filters
         """
         # If no filters are set, match everything
-        if not any([
-            self.subscription.platforms,
-            self.subscription.contact_ids,
-            self.subscription.thread_ids,
-            self.subscription.message_types,
-        ]):
+        if not any(
+            [
+                self.subscription.platforms,
+                self.subscription.contact_ids,
+                self.subscription.thread_ids,
+                self.subscription.message_types,
+            ]
+        ):
             return True
 
         # Check platform filter
@@ -190,9 +192,7 @@ class WebSocketManager:
             f"(total connections: {len(self.active_connections)})"
         )
 
-    async def get_connection(
-        self, connection_id: str
-    ) -> Optional[WebSocketConnection]:
+    async def get_connection(self, connection_id: str) -> Optional[WebSocketConnection]:
         """
         Get a connection by ID.
 
@@ -259,9 +259,7 @@ class WebSocketManager:
                 await connection.send_json(message)
                 sent_count += 1
             except Exception as e:
-                logger.error(
-                    f"Failed to send to {connection_id}: {e}"
-                )
+                logger.error(f"Failed to send to {connection_id}: {e}")
                 failed_connections.append(connection_id)
 
         # Clean up failed connections
@@ -273,9 +271,7 @@ class WebSocketManager:
 
         return sent_count
 
-    async def broadcast_to_user(
-        self, user_id: UUID, message: dict
-    ) -> int:
+    async def broadcast_to_user(self, user_id: UUID, message: dict) -> int:
         """
         Broadcast a message to all connections for a specific user.
 
@@ -297,9 +293,7 @@ class WebSocketManager:
                 await connection.send_json(message)
                 sent_count += 1
             except Exception as e:
-                logger.error(
-                    f"Failed to send to {connection_id}: {e}"
-                )
+                logger.error(f"Failed to send to {connection_id}: {e}")
                 failed_connections.append(connection_id)
 
         # Clean up failed connections
@@ -313,9 +307,7 @@ class WebSocketManager:
 
         return sent_count
 
-    async def send_to_connection(
-        self, connection_id: str, message: dict
-    ) -> bool:
+    async def send_to_connection(self, connection_id: str, message: dict) -> bool:
         """
         Send a message to a specific connection.
 
@@ -361,8 +353,7 @@ class WebSocketManager:
     def get_connections_by_user(self, user_id: UUID) -> list[WebSocketConnection]:
         """Get all connections for a specific user."""
         return [
-            conn for conn in self.active_connections.values()
-            if conn.user_id == user_id
+            conn for conn in self.active_connections.values() if conn.user_id == user_id
         ]
 
     async def close_all(self) -> None:

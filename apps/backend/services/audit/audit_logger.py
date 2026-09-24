@@ -12,11 +12,12 @@ Tracks data access and modifications for compliance:
 import logging
 from datetime import datetime
 from enum import Enum
-from typing import Optional, Any
+from typing import Any, Optional
 from uuid import UUID
 
-from sqlalchemy import Column, String, DateTime, Integer, Text, Index
-from sqlalchemy.dialects.postgresql import UUID as PGUUID, JSONB
+from sqlalchemy import Column, DateTime, Index, Integer, String, Text
+from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from db.base import Base
@@ -26,6 +27,7 @@ logger = logging.getLogger(__name__)
 
 class AuditAction(str, Enum):
     """Audit action types."""
+
     # Authentication
     LOGIN = "login"
     LOGOUT = "logout"
@@ -87,9 +89,9 @@ class AuditLog(Base):
 
     # Indexes for common queries
     __table_args__ = (
-        Index('ix_audit_logs_user_timestamp', 'user_id', 'timestamp'),
-        Index('ix_audit_logs_action_timestamp', 'action', 'timestamp'),
-        Index('ix_audit_logs_resource', 'resource_type', 'resource_id'),
+        Index("ix_audit_logs_user_timestamp", "user_id", "timestamp"),
+        Index("ix_audit_logs_action_timestamp", "action", "timestamp"),
+        Index("ix_audit_logs_resource", "resource_type", "resource_id"),
     )
 
 
@@ -176,7 +178,7 @@ class AuditLogger:
         resource_type: str,
         resource_id: str,
         action: AuditAction = AuditAction.READ,
-        **kwargs
+        **kwargs,
     ) -> AuditLog:
         """
         Log data access event.
@@ -200,7 +202,7 @@ class AuditLogger:
             username=username,
             resource_type=resource_type,
             resource_id=resource_id,
-            **kwargs
+            **kwargs,
         )
 
 

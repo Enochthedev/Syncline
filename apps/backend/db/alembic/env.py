@@ -12,21 +12,20 @@ import sys
 from logging.config import fileConfig
 from pathlib import Path
 
+from alembic import context
 from sqlalchemy import pool
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
-from alembic import context
-
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-# Import base and all models
-from db.base import Base
-from config.config import settings
-
 # Import all models so Alembic can detect them
 import db.models  # noqa: F401
+from config.config import settings
+
+# Import base and all models
+from db.base import Base
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

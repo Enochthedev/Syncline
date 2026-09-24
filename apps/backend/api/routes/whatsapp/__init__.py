@@ -10,11 +10,13 @@ Modular WhatsApp routes split by functionality:
 """
 
 from fastapi import APIRouter
+
 from . import auth, messaging, messaging_enhanced, status
 
 # Try to import auth_enhanced if it exists
 try:
     from . import auth_enhanced
+
     HAS_AUTH_ENHANCED = True
 except ImportError:
     HAS_AUTH_ENHANCED = False
@@ -27,10 +29,16 @@ router = APIRouter()
 # Include sub-routers
 router.include_router(auth.router, tags=["WhatsApp Auth"])
 router.include_router(messaging.router, tags=["WhatsApp Messaging"])
-router.include_router(messaging_enhanced.router, prefix="/enhanced", tags=["WhatsApp Enhanced"])
+router.include_router(
+    messaging_enhanced.router, prefix="/enhanced", tags=["WhatsApp Enhanced"]
+)
 router.include_router(status.router, tags=["WhatsApp Status"])
-router.include_router(connections_router, prefix="/connections", tags=["WhatsApp Connections"])
+router.include_router(
+    connections_router, prefix="/connections", tags=["WhatsApp Connections"]
+)
 
 # Include enhanced auth if available
 if HAS_AUTH_ENHANCED:
-    router.include_router(auth_enhanced.router, prefix="/enhanced", tags=["WhatsApp Auth Enhanced"])
+    router.include_router(
+        auth_enhanced.router, prefix="/enhanced", tags=["WhatsApp Auth Enhanced"]
+    )

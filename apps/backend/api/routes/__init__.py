@@ -12,6 +12,6 @@ Contains all API endpoint routers:
 - AI endpoints
 """
 
-from . import health, connections, chats, ai
+from . import ai, chats, connections, health
 
 __all__ = ["health", "connections", "chats", "ai"]

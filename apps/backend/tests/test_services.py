@@ -4,8 +4,9 @@ Service Tests
 Tests for backend services.
 """
 
-import pytest
 from datetime import datetime
+
+import pytest
 
 
 class TestLoggingService:

@@ -5,16 +5,17 @@ Provides test fixtures and configuration for API testing,
 including performance and security test suites.
 """
 
-import os
-import pytest
 import asyncio
+import os
 from typing import AsyncGenerator
 
 import httpx
+import pytest
 
 # Try to import app, but allow tests to run without it
 try:
     from main import app
+
     APP_AVAILABLE = True
 except ImportError:
     APP_AVAILABLE = False
@@ -25,23 +26,16 @@ except ImportError:
 # PYTEST CONFIGURATION
 # ==============================================================================
 
+
 def pytest_configure(config):
     """Configure custom markers for test categorization."""
-    config.addinivalue_line(
-        "markers", "security: mark test as a security test"
-    )
-    config.addinivalue_line(
-        "markers", "performance: mark test as a performance test"
-    )
+    config.addinivalue_line("markers", "security: mark test as a security test")
+    config.addinivalue_line("markers", "performance: mark test as a performance test")
     config.addinivalue_line(
         "markers", "slow: mark test as slow (excluded from normal runs)"
     )
-    config.addinivalue_line(
-        "markers", "stress: mark test as a stress test"
-    )
-    config.addinivalue_line(
-        "markers", "benchmark: mark test as a benchmark"
-    )
+    config.addinivalue_line("markers", "stress: mark test as a stress test")
+    config.addinivalue_line("markers", "benchmark: mark test as a benchmark")
 
 
 def pytest_collection_modifyitems(config, items):
@@ -50,7 +44,7 @@ def pytest_collection_modifyitems(config, items):
         # Auto-mark security tests
         if "security" in str(item.fspath):
             item.add_marker(pytest.mark.security)
-        
+
         # Auto-mark performance tests
         if "performance" in str(item.fspath):
             item.add_marker(pytest.mark.performance)
@@ -59,6 +53,7 @@ def pytest_collection_modifyitems(config, items):
 # ==============================================================================
 # EVENT LOOP FIXTURE
 # ==============================================================================
+
 
 @pytest.fixture(scope="session")
 def event_loop():
@@ -71,6 +66,7 @@ def event_loop():
 # ==============================================================================
 # HTTP CLIENT FIXTURES
 # ==============================================================================
+
 
 @pytest.fixture
 async def client() -> AsyncGenerator[httpx.AsyncClient, None]:
@@ -108,6 +104,7 @@ def auth_headers(auth_token) -> dict:
 # TEST DATA FIXTURES
 # ==============================================================================
 
+
 @pytest.fixture
 def sample_message() -> dict:
     """Sample message for testing."""
@@ -116,7 +113,7 @@ def sample_message() -> dict:
         "content": "This is a test message for testing purposes.",
         "sender_id": "test_sender",
         "platform": "test",
-        "timestamp": "2026-01-05T00:00:00Z"
+        "timestamp": "2026-01-05T00:00:00Z",
     }
 
 
@@ -127,7 +124,7 @@ def sample_contact() -> dict:
         "id": "test_contact_001",
         "name": "Test Contact",
         "email": "test@example.com",
-        "phone": "+1234567890"
+        "phone": "+1234567890",
     }
 
 
@@ -160,6 +157,7 @@ def xss_payloads() -> list:
 # RESULTS DIRECTORY FIXTURE
 # ==============================================================================
 
+
 @pytest.fixture(scope="session")
 def results_dir(tmp_path_factory) -> str:
     """Create and return results directory for test outputs."""
@@ -173,11 +171,9 @@ def results_dir(tmp_path_factory) -> str:
 
 skip_if_no_server = pytest.mark.skipif(
     os.getenv("SKIP_LIVE_TESTS", "false").lower() == "true",
-    reason="Live server tests disabled"
+    reason="Live server tests disabled",
 )
 
 skip_if_no_auth = pytest.mark.skipif(
-    not os.getenv("TEST_AUTH_TOKEN"),
-    reason="No authentication token provided"
+    not os.getenv("TEST_AUTH_TOKEN"), reason="No authentication token provided"
 )
-

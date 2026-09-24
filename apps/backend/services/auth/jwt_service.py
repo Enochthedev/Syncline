@@ -75,9 +75,7 @@ class JWTService:
         Returns:
             JWT access token
         """
-        expire = datetime.utcnow() + timedelta(
-            minutes=self.access_token_expire_minutes
-        )
+        expire = datetime.utcnow() + timedelta(minutes=self.access_token_expire_minutes)
 
         claims = {
             "sub": str(user_id),
@@ -109,9 +107,7 @@ class JWTService:
         Returns:
             JWT refresh token
         """
-        expire = datetime.utcnow() + timedelta(
-            days=self.refresh_token_expire_days
-        )
+        expire = datetime.utcnow() + timedelta(days=self.refresh_token_expire_days)
 
         claims = {
             "sub": str(user_id),
@@ -139,11 +135,7 @@ class JWTService:
             jwt.ExpiredSignatureError: If token is expired
         """
         try:
-            claims = jwt.decode(
-                token,
-                self.secret_key,
-                algorithms=[self.algorithm]
-            )
+            claims = jwt.decode(token, self.secret_key, algorithms=[self.algorithm])
             return claims
         except jwt.ExpiredSignatureError:
             logger.warning("Token expired")

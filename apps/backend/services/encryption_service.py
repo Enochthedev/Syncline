@@ -7,13 +7,14 @@ and connection credentials stored in the database.
 Uses Fernet (symmetric encryption) from the cryptography library.
 """
 
-import json
 import base64
-from typing import Dict, Any, Optional
+import json
+from typing import Any, Dict, Optional
+
 from cryptography.fernet import Fernet
+from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
-from cryptography.hazmat.backends import default_backend
 
 from config.config import settings
 
@@ -50,7 +51,7 @@ class EncryptionService:
         """
         # Use a static salt derived from SECRET_KEY
         # In production, consider storing this salt separately
-        salt = self.secret_key[:16].ljust(16, '0').encode('utf-8')
+        salt = self.secret_key[:16].ljust(16, "0").encode("utf-8")
 
         # Derive encryption key using PBKDF2HMAC
         kdf = PBKDF2HMAC(
@@ -58,9 +59,9 @@ class EncryptionService:
             length=32,
             salt=salt,
             iterations=100000,
-            backend=default_backend()
+            backend=default_backend(),
         )
-        key = base64.urlsafe_b64encode(kdf.derive(self.secret_key.encode('utf-8')))
+        key = base64.urlsafe_b64encode(kdf.derive(self.secret_key.encode("utf-8")))
 
         return Fernet(key)
 
@@ -85,8 +86,8 @@ class EncryptionService:
         json_str = json.dumps(credentials)
 
         # Encrypt and return as string
-        encrypted_bytes = self._cipher.encrypt(json_str.encode('utf-8'))
-        return encrypted_bytes.decode('utf-8')
+        encrypted_bytes = self._cipher.encrypt(json_str.encode("utf-8"))
+        return encrypted_bytes.decode("utf-8")
 
     def decrypt_credentials(self, encrypted_credentials: str) -> Dict[str, Any]:
         """
@@ -110,10 +111,12 @@ class EncryptionService:
 
         try:
             # Decrypt bytes
-            decrypted_bytes = self._cipher.decrypt(encrypted_credentials.encode('utf-8'))
+            decrypted_bytes = self._cipher.decrypt(
+                encrypted_credentials.encode("utf-8")
+            )
 
             # Convert back to dict
-            json_str = decrypted_bytes.decode('utf-8')
+            json_str = decrypted_bytes.decode("utf-8")
             return json.loads(json_str)
         except Exception as e:
             raise ValueError(f"Failed to decrypt credentials: {str(e)}")
@@ -131,8 +134,8 @@ class EncryptionService:
         if not value:
             return ""
 
-        encrypted_bytes = self._cipher.encrypt(value.encode('utf-8'))
-        return encrypted_bytes.decode('utf-8')
+        encrypted_bytes = self._cipher.encrypt(value.encode("utf-8"))
+        return encrypted_bytes.decode("utf-8")
 
     def decrypt_value(self, encrypted_value: str) -> str:
         """
@@ -151,8 +154,8 @@ class EncryptionService:
             return ""
 
         try:
-            decrypted_bytes = self._cipher.decrypt(encrypted_value.encode('utf-8'))
-            return decrypted_bytes.decode('utf-8')
+            decrypted_bytes = self._cipher.decrypt(encrypted_value.encode("utf-8"))
+            return decrypted_bytes.decode("utf-8")
         except Exception as e:
             raise ValueError(f"Failed to decrypt value: {str(e)}")
 

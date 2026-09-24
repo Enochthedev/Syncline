@@ -14,12 +14,14 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from sqlalchemy import select
-from db.session import get_session
-from db.models.user import User
-from db.models.platform_connection import PlatformConnection, PlatformType
-from services.whatsapp_connection_manager import get_whatsapp_connection_manager
-from integrations.whatsapp_connector_enhanced import EnhancedWhatsAppConnector
+
 from config.config import settings
+from db.models.platform_connection import PlatformConnection, PlatformType
+from db.models.user import User
+from db.session import get_session
+from integrations.whatsapp_connector_enhanced import EnhancedWhatsAppConnector
+from services.whatsapp_connection_manager import get_whatsapp_connection_manager
+
 
 async def test_full_flow():
     print("=" * 80)
@@ -87,8 +89,7 @@ async def test_full_flow():
 
         # Create enhanced connector
         connector = EnhancedWhatsAppConnector(
-            connection_id=connection_id,
-            credentials=credentials
+            connection_id=connection_id, credentials=credentials
         )
 
         try:
@@ -133,9 +134,12 @@ async def test_full_flow():
             print("\nTroubleshooting:")
             print("1. Check if bridge is running: docker ps | grep whatsapp")
             print("2. Check bridge logs: docker logs syncline-whatsapp-bridge")
-            print("3. Verify Matrix homeserver: curl http://localhost:8008/_matrix/client/versions")
+            print(
+                "3. Verify Matrix homeserver: curl http://localhost:8008/_matrix/client/versions"
+            )
         finally:
             await connector.disconnect()
+
 
 if __name__ == "__main__":
     asyncio.run(test_full_flow())

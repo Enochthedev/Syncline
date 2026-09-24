@@ -14,12 +14,12 @@ from datetime import datetime
 from typing import Optional
 from uuid import UUID, uuid4
 
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query
+from fastapi import APIRouter, Query, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel
 
 from services.realtime.websocket_manager import (
-    get_websocket_manager,
     ConnectionSubscription,
+    get_websocket_manager,
 )
 
 logger = logging.getLogger(__name__)
@@ -71,7 +71,9 @@ class PongMessage(BaseModel):
 @router.websocket("/ws")
 async def websocket_endpoint(
     websocket: WebSocket,
-    user_id: Optional[str] = Query(None, description="User ID (for future multi-tenant support)"),
+    user_id: Optional[str] = Query(
+        None, description="User ID (for future multi-tenant support)"
+    ),
 ):
     """
     WebSocket endpoint for real-time updates.
@@ -131,13 +133,15 @@ async def websocket_endpoint(
         )
 
         # Send connection confirmation
-        await connection.send_json({
-            "type": "connected",
-            "data": {
-                "connection_id": connection_id,
-                "timestamp": datetime.utcnow().isoformat(),
+        await connection.send_json(
+            {
+                "type": "connected",
+                "data": {
+                    "connection_id": connection_id,
+                    "timestamp": datetime.utcnow().isoformat(),
+                },
             }
-        })
+        )
 
         # Message handling loop
         while True:
@@ -168,13 +172,15 @@ async def websocket_endpoint(
 
                 else:
                     # Unknown message type
-                    await connection.send_json({
-                        "type": "error",
-                        "data": {
-                            "message": f"Unknown message type: {message_type}",
-                            "timestamp": datetime.utcnow().isoformat(),
+                    await connection.send_json(
+                        {
+                            "type": "error",
+                            "data": {
+                                "message": f"Unknown message type: {message_type}",
+                                "timestamp": datetime.utcnow().isoformat(),
+                            },
                         }
-                    })
+                    )
 
             except WebSocketDisconnect:
                 logger.info(f"WebSocket disconnected: {connection_id}")
@@ -185,13 +191,15 @@ async def websocket_endpoint(
                     f"Error processing WebSocket message from {connection_id}: {e}"
                 )
                 try:
-                    await connection.send_json({
-                        "type": "error",
-                        "data": {
-                            "message": str(e),
-                            "timestamp": datetime.utcnow().isoformat(),
+                    await connection.send_json(
+                        {
+                            "type": "error",
+                            "data": {
+                                "message": str(e),
+                                "timestamp": datetime.utcnow().isoformat(),
+                            },
                         }
-                    })
+                    )
                 except Exception:
                     # Connection likely broken, exit loop
                     break
@@ -248,16 +256,34 @@ async def handle_subscribe(
         # Send confirmation
         connection = await manager.get_connection(connection_id)
         if connection:
-            await connection.send_json({
-                "type": "subscribed",
-                "data": {
-                    "platforms": list(subscription.platforms) if subscription.platforms else None,
-                    "contact_ids": [str(cid) for cid in subscription.contact_ids] if subscription.contact_ids else None,
-                    "thread_ids": list(subscription.thread_ids) if subscription.thread_ids else None,
-                    "message_types": list(subscription.message_types) if subscription.message_types else None,
-                    "timestamp": datetime.utcnow().isoformat(),
+            await connection.send_json(
+                {
+                    "type": "subscribed",
+                    "data": {
+                        "platforms": (
+                            list(subscription.platforms)
+                            if subscription.platforms
+                            else None
+                        ),
+                        "contact_ids": (
+                            [str(cid) for cid in subscription.contact_ids]
+                            if subscription.contact_ids
+                            else None
+                        ),
+                        "thread_ids": (
+                            list(subscription.thread_ids)
+                            if subscription.thread_ids
+                            else None
+                        ),
+                        "message_types": (
+                            list(subscription.message_types)
+                            if subscription.message_types
+                            else None
+                        ),
+                        "timestamp": datetime.utcnow().isoformat(),
+                    },
                 }
-            })
+            )
 
         logger.info(f"Updated subscription for {connection_id}")
 
@@ -286,12 +312,14 @@ async def handle_unsubscribe(
         # Send confirmation
         connection = await manager.get_connection(connection_id)
         if connection:
-            await connection.send_json({
-                "type": "unsubscribed",
-                "data": {
-                    "timestamp": datetime.utcnow().isoformat(),
+            await connection.send_json(
+                {
+                    "type": "unsubscribed",
+                    "data": {
+                        "timestamp": datetime.utcnow().isoformat(),
+                    },
                 }
-            })
+            )
 
         logger.info(f"Cleared subscription for {connection_id}")
 
@@ -315,12 +343,14 @@ async def handle_ping(connection_id: str, manager) -> None:
         # Send pong response
         connection = await manager.get_connection(connection_id)
         if connection:
-            await connection.send_json({
-                "type": "pong",
-                "data": {
-                    "timestamp": datetime.utcnow().isoformat(),
+            await connection.send_json(
+                {
+                    "type": "pong",
+                    "data": {
+                        "timestamp": datetime.utcnow().isoformat(),
+                    },
                 }
-            })
+            )
 
     except Exception as e:
         logger.error(f"Error handling ping message: {e}")

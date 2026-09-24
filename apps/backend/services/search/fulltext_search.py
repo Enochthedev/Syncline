@@ -14,29 +14,43 @@ from datetime import datetime
 from typing import Optional
 from uuid import UUID
 
-from sqlalchemy import select, and_, or_, func, text
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.dialects.postgresql import TSVECTOR
 from pydantic import BaseModel, Field
+from sqlalchemy import and_, func, or_, select, text
+from sqlalchemy.dialects.postgresql import TSVECTOR
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from db.models.message import Message
 from db.models.contact import Contact
+from db.models.message import Message
 
 logger = logging.getLogger(__name__)
 
 
 class FullTextSearchFilter(BaseModel):
     """Filters for full-text search."""
-    platforms: Optional[list[str]] = Field(default=None, description="Filter by platforms")
-    contact_ids: Optional[list[UUID]] = Field(default=None, description="Filter by contact IDs")
-    thread_ids: Optional[list[str]] = Field(default=None, description="Filter by thread IDs")
-    start_date: Optional[datetime] = Field(default=None, description="Filter messages after this date")
-    end_date: Optional[datetime] = Field(default=None, description="Filter messages before this date")
-    has_attachments: Optional[bool] = Field(default=None, description="Filter by attachment presence")
+
+    platforms: Optional[list[str]] = Field(
+        default=None, description="Filter by platforms"
+    )
+    contact_ids: Optional[list[UUID]] = Field(
+        default=None, description="Filter by contact IDs"
+    )
+    thread_ids: Optional[list[str]] = Field(
+        default=None, description="Filter by thread IDs"
+    )
+    start_date: Optional[datetime] = Field(
+        default=None, description="Filter messages after this date"
+    )
+    end_date: Optional[datetime] = Field(
+        default=None, description="Filter messages before this date"
+    )
+    has_attachments: Optional[bool] = Field(
+        default=None, description="Filter by attachment presence"
+    )
 
 
 class FullTextSearchResult(BaseModel):
     """Search result with message details and relevance ranking."""
+
     message_id: UUID
     platform: str
     platform_message_id: str
@@ -49,6 +63,7 @@ class FullTextSearchResult(BaseModel):
 
     class Config:
         """Pydantic config."""
+
         from_attributes = True
 
 
@@ -120,12 +135,12 @@ class FullTextSearchService:
             ).params(query=ts_query)
 
             # Create selection with rank
-            stmt_with_rank = select(
-                Message,
-                rank_expr.label('rank')
-            ).select_from(Message).where(
-                text("search_vector @@ to_tsquery('english', :query)")
-            ).params(query=ts_query)
+            stmt_with_rank = (
+                select(Message, rank_expr.label("rank"))
+                .select_from(Message)
+                .where(text("search_vector @@ to_tsquery('english', :query)"))
+                .params(query=ts_query)
+            )
 
             # Apply filters to ranked query
             if filters:
@@ -134,12 +149,15 @@ class FullTextSearchService:
                     stmt_with_rank = stmt_with_rank.where(and_(*conditions))
 
             # Order by rank (descending)
-            stmt_with_rank = stmt_with_rank.order_by(text('rank DESC'))
+            stmt_with_rank = stmt_with_rank.order_by(text("rank DESC"))
 
             # Get total count (before pagination)
-            count_stmt = select(func.count()).select_from(Message).where(
-                text("search_vector @@ to_tsquery('english', :query)")
-            ).params(query=ts_query)
+            count_stmt = (
+                select(func.count())
+                .select_from(Message)
+                .where(text("search_vector @@ to_tsquery('english', :query)"))
+                .params(query=ts_query)
+            )
 
             if filters:
                 conditions = self._build_filter_conditions(filters)
@@ -165,21 +183,21 @@ class FullTextSearchService:
                 # Generate headline (highlighted snippet) if requested
                 headline = None
                 if include_highlights:
-                    headline = await self._generate_headline(
-                        message, ts_query, db
-                    )
+                    headline = await self._generate_headline(message, ts_query, db)
 
-                results.append(FullTextSearchResult(
-                    message_id=message.id,
-                    platform=message.platform,
-                    platform_message_id=message.platform_message_id,
-                    thread_id=message.thread_id,
-                    sender_id=message.sender_id,
-                    content=message.content,
-                    timestamp=message.timestamp,
-                    rank=rank,
-                    headline=headline,
-                ))
+                results.append(
+                    FullTextSearchResult(
+                        message_id=message.id,
+                        platform=message.platform,
+                        platform_message_id=message.platform_message_id,
+                        thread_id=message.thread_id,
+                        sender_id=message.sender_id,
+                        content=message.content,
+                        timestamp=message.timestamp,
+                        rank=rank,
+                        headline=headline,
+                    )
+                )
 
             logger.info(
                 f"Full-text search returned {len(results)} results "
@@ -216,7 +234,7 @@ class FullTextSearchService:
         sanitized_words = []
         for word in words:
             # Remove characters that aren't alphanumeric, *, or -
-            word = ''.join(c for c in word if c.isalnum() or c in ('*', '-', '_'))
+            word = "".join(c for c in word if c.isalnum() or c in ("*", "-", "_"))
             if word:
                 sanitized_words.append(word)
 
@@ -224,14 +242,12 @@ class FullTextSearchService:
             return ""
 
         # Join with & (AND operator) for tsquery
-        ts_query = ' & '.join(sanitized_words)
+        ts_query = " & ".join(sanitized_words)
 
         logger.debug(f"Parsed query: '{query}' -> '{ts_query}'")
         return ts_query
 
-    def _build_filter_conditions(
-        self, filters: FullTextSearchFilter
-    ) -> list:
+    def _build_filter_conditions(self, filters: FullTextSearchFilter) -> list:
         """
         Build SQLAlchemy filter conditions from search filters.
 
@@ -263,12 +279,16 @@ class FullTextSearchService:
             if filters.has_attachments:
                 # Has attachments
                 conditions.append(
-                    text("EXISTS (SELECT 1 FROM attachments WHERE attachments.message_id = messages.id)")
+                    text(
+                        "EXISTS (SELECT 1 FROM attachments WHERE attachments.message_id = messages.id)"
+                    )
                 )
             else:
                 # No attachments
                 conditions.append(
-                    text("NOT EXISTS (SELECT 1 FROM attachments WHERE attachments.message_id = messages.id)")
+                    text(
+                        "NOT EXISTS (SELECT 1 FROM attachments WHERE attachments.message_id = messages.id)"
+                    )
                 )
 
         return conditions
@@ -291,7 +311,7 @@ class FullTextSearchService:
         """
         try:
             # Get message text content
-            text_content = message.content.get('text', '')
+            text_content = message.content.get("text", "")
 
             if not text_content:
                 return None
@@ -324,10 +344,7 @@ class FullTextSearchService:
     ) -> tuple[list[FullTextSearchResult], int]:
         """Search within a specific thread."""
         return await self.search(
-            query,
-            db,
-            limit=limit,
-            filters=FullTextSearchFilter(thread_ids=[thread_id])
+            query, db, limit=limit, filters=FullTextSearchFilter(thread_ids=[thread_id])
         )
 
     async def search_by_platform(
@@ -339,10 +356,7 @@ class FullTextSearchService:
     ) -> tuple[list[FullTextSearchResult], int]:
         """Search within a specific platform."""
         return await self.search(
-            query,
-            db,
-            limit=limit,
-            filters=FullTextSearchFilter(platforms=[platform])
+            query, db, limit=limit, filters=FullTextSearchFilter(platforms=[platform])
         )
 
     async def search_by_contact(
@@ -357,7 +371,7 @@ class FullTextSearchService:
             query,
             db,
             limit=limit,
-            filters=FullTextSearchFilter(contact_ids=[contact_id])
+            filters=FullTextSearchFilter(contact_ids=[contact_id]),
         )
 
     async def search_by_date_range(
@@ -373,10 +387,7 @@ class FullTextSearchService:
             query,
             db,
             limit=limit,
-            filters=FullTextSearchFilter(
-                start_date=start_date,
-                end_date=end_date
-            )
+            filters=FullTextSearchFilter(start_date=start_date, end_date=end_date),
         )
 
 

@@ -8,9 +8,9 @@ Provides real-time update capabilities:
 """
 
 from services.realtime.websocket_manager import (
-    WebSocketManager,
-    WebSocketConnection,
     ConnectionSubscription,
+    WebSocketConnection,
+    WebSocketManager,
     get_websocket_manager,
 )
 

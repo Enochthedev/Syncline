@@ -6,19 +6,23 @@ Represents authenticated connections to communication platforms.
 Credentials are automatically encrypted at rest using Fernet symmetric encryption.
 """
 
-from sqlalchemy import Column, String, ForeignKey, DateTime, Enum as SQLEnum, Text
-from sqlalchemy.dialects.postgresql import UUID, JSONB
-from sqlalchemy.orm import relationship
 import enum
-from typing import Dict, Any, Optional
 import json
 from datetime import datetime, timezone
+from typing import Any, Dict, Optional
+
+from sqlalchemy import Column, DateTime
+from sqlalchemy import Enum as SQLEnum
+from sqlalchemy import ForeignKey, String, Text
+from sqlalchemy.dialects.postgresql import JSONB, UUID
+from sqlalchemy.orm import relationship
 
 from db.base import Base
 
 
 class PlatformType(str, enum.Enum):
     """Supported communication platforms."""
+
     GMAIL = "gmail"
     SLACK = "slack"
     DISCORD = "discord"
@@ -31,6 +35,7 @@ class PlatformType(str, enum.Enum):
 
 class ConnectionStatus(str, enum.Enum):
     """Connection status states."""
+
     ACTIVE = "active"
     INACTIVE = "inactive"
     EXPIRED = "expired"
@@ -41,7 +46,7 @@ class ConnectionStatus(str, enum.Enum):
 class PlatformConnection(Base):
     """
     Platform connection model for OAuth and authentication.
-    
+
     Attributes:
         user_id: Foreign key to User
         platform: Platform type (gmail, slack, etc.)
@@ -52,24 +57,22 @@ class PlatformConnection(Base):
         user: Related user
         raw_messages: Related raw messages
     """
-    
+
     __tablename__ = "platform_connections"
-    
+
     # Foreign key to user
     user_id = Column(
         UUID(as_uuid=True),
         ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False,
-        index=True
+        index=True,
     )
-    
+
     # Platform information
     platform = Column(
-        SQLEnum(PlatformType, name="platform_type"),
-        nullable=False,
-        index=True
+        SQLEnum(PlatformType, name="platform_type"), nullable=False, index=True
     )
-    
+
     # Encrypted credentials (OAuth tokens, API keys, etc.)
     # Stored as encrypted text using Fernet encryption
     # Decrypted structure: {
@@ -83,15 +86,15 @@ class PlatformConnection(Base):
     # unencrypted (JSONB) formats. New connections use encrypted format.
     _credentials_encrypted = Column("credentials_encrypted", Text, nullable=True)
     _credentials_legacy = Column("credentials", JSONB, nullable=True)
-    
+
     # Connection status
     status = Column(
         SQLEnum(ConnectionStatus, name="connection_status"),
         default=ConnectionStatus.ACTIVE,
         nullable=False,
-        index=True
+        index=True,
     )
-    
+
     # Sync tracking
     last_sync_at = Column(DateTime, nullable=True)
 
@@ -107,13 +110,11 @@ class PlatformConnection(Base):
     #   ...
     # }
     platform_metadata = Column(JSONB, nullable=True)
-    
+
     # Relationships
     user = relationship("User", back_populates="platform_connections")
     raw_messages = relationship(
-        "RawMessage",
-        back_populates="connection",
-        cascade="all, delete-orphan"
+        "RawMessage", back_populates="connection", cascade="all, delete-orphan"
     )
 
     @property
@@ -130,6 +131,7 @@ class PlatformConnection(Base):
         # Try encrypted credentials first (new format)
         if self._credentials_encrypted:
             from services.encryption_service import get_encryption_service
+
             try:
                 return get_encryption_service().decrypt_credentials(
                     self._credentials_encrypted
@@ -137,6 +139,7 @@ class PlatformConnection(Base):
             except Exception as e:
                 # Log error but don't crash - fall through to legacy
                 import logging
+
                 logging.warning(
                     f"Failed to decrypt credentials for connection {self.id}: {e}"
                 )
@@ -160,7 +163,9 @@ class PlatformConnection(Base):
         from services.encryption_service import get_encryption_service
 
         # Encrypt and store in new format
-        self._credentials_encrypted = get_encryption_service().encrypt_credentials(value)
+        self._credentials_encrypted = get_encryption_service().encrypt_credentials(
+            value
+        )
 
         # Clear legacy field to save space
         self._credentials_legacy = None
@@ -225,7 +230,7 @@ class PlatformConnection(Base):
         if self.credentials_version:
             # Extract version number and increment
             try:
-                current_version = int(self.credentials_version.lstrip('v'))
+                current_version = int(self.credentials_version.lstrip("v"))
                 self.credentials_version = f"v{current_version + 1}"
             except (ValueError, AttributeError):
                 self.credentials_version = "v2"
@@ -250,11 +255,13 @@ class PlatformConnection(Base):
         if not self.credentials_rotated_at:
             # Never rotated - check creation time
             from datetime import timedelta
+
             age = datetime.now(timezone.utc) - self.created_at
             return age.days > max_age_days
 
         # Check rotation age
         from datetime import timedelta
+
         age_since_rotation = datetime.now(timezone.utc) - self.credentials_rotated_at
         return age_since_rotation.days > max_age_days
 

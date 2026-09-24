@@ -13,16 +13,16 @@ Provides Prometheus metrics for monitoring:
 import logging
 import time
 from functools import wraps
-from typing import Callable, Any
+from typing import Any, Callable
 
 from prometheus_client import (
-    Counter,
-    Histogram,
-    Gauge,
-    Info,
-    generate_latest,
     CONTENT_TYPE_LATEST,
     CollectorRegistry,
+    Counter,
+    Gauge,
+    Histogram,
+    Info,
+    generate_latest,
 )
 
 logger = logging.getLogger(__name__)
@@ -233,11 +233,13 @@ app_info = Info(
 )
 
 # Set app info
-app_info.info({
-    "name": "R.E.M.I Backend",
-    "version": "1.0.0",
-    "environment": "development",
-})
+app_info.info(
+    {
+        "name": "R.E.M.I Backend",
+        "version": "1.0.0",
+        "environment": "development",
+    }
+)
 
 # =============================================================================
 # Metric Helpers
@@ -255,7 +257,9 @@ def track_request_metrics(method: str, endpoint: str, status: int, duration: flo
         duration: Request duration in seconds
     """
     http_requests_total.labels(method=method, endpoint=endpoint, status=status).inc()
-    http_request_duration_seconds.labels(method=method, endpoint=endpoint).observe(duration)
+    http_request_duration_seconds.labels(method=method, endpoint=endpoint).observe(
+        duration
+    )
 
 
 def track_message_collected(platform: str):
@@ -329,6 +333,7 @@ def track_time(metric: Histogram, *labels):
         metric: Histogram metric to track
         *labels: Label values for the metric
     """
+
     def decorator(func: Callable) -> Callable:
         @wraps(func)
         async def async_wrapper(*args, **kwargs):
@@ -351,6 +356,7 @@ def track_time(metric: Histogram, *labels):
                 metric.labels(*labels).observe(duration)
 
         import asyncio
+
         if asyncio.iscoroutinefunction(func):
             return async_wrapper
         else:

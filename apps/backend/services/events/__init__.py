@@ -9,30 +9,30 @@ This package provides event-driven architecture components:
 - Dead letter queue for failed events
 """
 
-from .types import (
-    EventType,
-    Event,
-    ConnectionEvent,
-    MessageEvent,
-    ContactEvent,
-    ThreadEvent,
-    AIEvent,
-)
-from .handlers import (
-    BaseEventHandler,
-    EventRouter,
-    EventDispatcher,
-    get_dispatcher,
-)
 from .consumer_groups import (
-    ConsumerInfo,
     ConsumerGroupManager,
+    ConsumerInfo,
     get_consumer_group_manager,
 )
 from .dead_letter_queue import (
-    FailedEvent,
     DeadLetterQueue,
+    FailedEvent,
     get_dead_letter_queue,
+)
+from .handlers import (
+    BaseEventHandler,
+    EventDispatcher,
+    EventRouter,
+    get_dispatcher,
+)
+from .types import (
+    AIEvent,
+    ConnectionEvent,
+    ContactEvent,
+    Event,
+    EventType,
+    MessageEvent,
+    ThreadEvent,
 )
 
 __all__ = [

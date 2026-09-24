@@ -7,9 +7,9 @@ Provides search capabilities for messages:
 """
 
 from services.search.fulltext_search import (
-    FullTextSearchService,
     FullTextSearchFilter,
     FullTextSearchResult,
+    FullTextSearchService,
     get_fulltext_search_service,
 )
 

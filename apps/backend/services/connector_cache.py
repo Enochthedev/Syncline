@@ -12,13 +12,12 @@ Features:
 """
 
 import asyncio
-from typing import Dict, Optional, Any, Type
-from datetime import datetime, timedelta, timezone
-from uuid import UUID
 import logging
+from datetime import datetime, timedelta, timezone
+from typing import Any, Dict, Optional, Type
+from uuid import UUID
 
 from integrations.base_connector import BaseConnector
-
 
 logger = logging.getLogger(__name__)
 
@@ -80,10 +79,7 @@ class ConnectorCache:
     """
 
     def __init__(
-        self,
-        max_size: int = 100,
-        default_ttl: int = 3600,
-        cleanup_interval: int = 300
+        self, max_size: int = 100, default_ttl: int = 3600, cleanup_interval: int = 300
     ):
         """
         Initialize connector cache.
@@ -168,7 +164,7 @@ class ConnectorCache:
         connection_id: UUID,
         connector_class: Type[BaseConnector],
         credentials: Dict[str, Any],
-        **kwargs
+        **kwargs,
     ) -> BaseConnector:
         """
         Get cached connector or create new one if not found.
@@ -201,9 +197,7 @@ class ConnectorCache:
             # Create new connector
             logger.info(f"Creating new connector for {connection_id}")
             connector = connector_class(
-                connection_id=connection_id,
-                credentials=credentials,
-                **kwargs
+                connection_id=connection_id, credentials=credentials, **kwargs
             )
 
             # Cache it
@@ -273,9 +267,7 @@ class ConnectorCache:
         Returns:
             Dict with cache stats (size, hit rate, etc.)
         """
-        total_accesses = sum(
-            cached.access_count for cached in self._cache.values()
-        )
+        total_accesses = sum(cached.access_count for cached in self._cache.values())
 
         return {
             "size": len(self._cache),
@@ -293,7 +285,7 @@ class ConnectorCache:
                     "last_accessed": cached.last_accessed_at.isoformat(),
                 }
                 for conn_id, cached in self._cache.items()
-            ]
+            ],
         }
 
     async def _evict_connector(self, connection_id: UUID) -> bool:
@@ -315,12 +307,10 @@ class ConnectorCache:
 
         # Disconnect the connector
         try:
-            if hasattr(cached.connector, 'disconnect'):
+            if hasattr(cached.connector, "disconnect"):
                 await cached.connector.disconnect()
         except Exception as e:
-            logger.warning(
-                f"Error disconnecting connector {connection_id}: {e}"
-            )
+            logger.warning(f"Error disconnecting connector {connection_id}: {e}")
 
         logger.debug(f"Evicted connector {connection_id} from cache")
         return True
@@ -337,7 +327,7 @@ class ConnectorCache:
         # Find LRU connector
         lru_id = min(
             self._cache.keys(),
-            key=lambda conn_id: self._cache[conn_id].last_accessed_at
+            key=lambda conn_id: self._cache[conn_id].last_accessed_at,
         )
 
         await self._evict_connector(lru_id)
@@ -347,9 +337,7 @@ class ConnectorCache:
         """
         Background task that periodically cleans up expired connectors.
         """
-        logger.info(
-            f"Background cleanup running every {self.cleanup_interval} seconds"
-        )
+        logger.info(f"Background cleanup running every {self.cleanup_interval} seconds")
 
         while True:
             try:
@@ -384,6 +372,6 @@ def get_connector_cache() -> ConnectorCache:
         _connector_cache = ConnectorCache(
             max_size=100,  # Max 100 cached connectors
             default_ttl=3600,  # 1 hour TTL
-            cleanup_interval=300  # Cleanup every 5 minutes
+            cleanup_interval=300,  # Cleanup every 5 minutes
         )
     return _connector_cache
